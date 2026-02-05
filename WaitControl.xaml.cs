@@ -14,7 +14,15 @@ namespace EtherCAT_Studio
         public void Load(JsonElement? root)
         {
             if (root == null) return;
-            if (root.Value.TryGetProperty("delay", out var d)) DelayBox.Text = d.ValueKind == JsonValueKind.Object && d.TryGetProperty("value", out var vd) ? vd.GetRawText() : d.GetRawText();
+            // Support both "delay" and "delay_ms"
+            if (root.Value.TryGetProperty("delay", out var d))
+            {
+                DelayBox.Text = d.ValueKind == JsonValueKind.Object && d.TryGetProperty("value", out var vd) ? vd.GetRawText() : d.GetRawText();
+            }
+            else if (root.Value.TryGetProperty("delay_ms", out var dm))
+            {
+                DelayBox.Text = dm.ValueKind == JsonValueKind.Object && dm.TryGetProperty("value", out var vdm) ? vdm.GetRawText() : dm.GetRawText();
+            }
         }
 
         public Dictionary<string, object> Collect()

@@ -10,6 +10,7 @@ namespace EtherCAT_Studio
     public class NodeControl : Canvas
     {
         private Border _backgroundBorder;
+        private TextBlock _numberBadge;
         private bool _isSelected;
         public bool IsSelected
         {
@@ -36,6 +37,8 @@ namespace EtherCAT_Studio
         public string NodeType { get; }
         public string OriginalLabel { get; } // 노드 타입 식별용 원래 라벨
 
+        public int NodeNumber { get; private set; }
+
         public string? JsonData { get; set; } // 노드별 JSON 데이터 저장
 
         public NodeControl(string text, Brush color, MainWindow main, double portSize = 16, double width = 140, double height = 48, bool hasInput = true, bool hasOutput = true, string nodeType = "")
@@ -56,6 +59,20 @@ namespace EtherCAT_Studio
             };
             _backgroundBorder = border;
             Children.Add(_backgroundBorder);
+
+            // 노드 번호 표시 배지
+            _numberBadge = new TextBlock
+            {
+                Text = string.Empty,
+                Foreground = Brushes.White,
+                Background = new SolidColorBrush(Color.FromArgb(160, 0, 0, 0)),
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                Padding = new Thickness(4, 1, 4, 1)
+            };
+            SetLeft(_numberBadge, 6);
+            SetTop(_numberBadge, 4);
+            Children.Add(_numberBadge);
 
             // 입력 포트 (옵션)
             if (hasInput)
@@ -151,6 +168,12 @@ namespace EtherCAT_Studio
             MouseLeftButtonUp += Node_MouseLeftButtonUp;
             // 노드 더블클릭: 속성 입력창
             MouseLeftButtonDown += Node_DoubleClick;
+        }
+
+        public void SetNodeNumber(int number)
+        {
+            NodeNumber = number;
+            _numberBadge.Text = number > 0 ? number.ToString() : string.Empty;
         }
 
         // 더블클릭 시 PropertyWindow 띄우기

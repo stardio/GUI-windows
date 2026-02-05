@@ -182,6 +182,9 @@ namespace EtherCAT_Studio
             // NodeControl 인스턴스 생성 (색상 전달)
             var node = new NodeControl(text, color, this, portSize, width, height, hasInput, hasOutput, nodeType);
 
+            int nextNumber = MainCanvas.Children.OfType<NodeControl>().Count() + 1;
+            node.SetNodeNumber(nextNumber);
+
             // 캔버스에 임의의 위치(계단식)로 배치
             double offset = 20 + (MainCanvas.Children.Count * 20);
             Canvas.SetLeft(node, offset);
@@ -349,7 +352,7 @@ namespace EtherCAT_Studio
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
                 DefaultExt = ".ethercat",
-                Filter = "EtherCAT Project (.ethercat)|*.ethercat"
+                Filter = "All Supported (*.ethercat;*.json)|*.ethercat;*.json|EtherCAT Project (*.ethercat)|*.ethercat|JSON Sequence (*.json)|*.json|All Files (*.*)|*.*"
             };
 
             if (dlg.ShowDialog() == true)
@@ -360,93 +363,111 @@ namespace EtherCAT_Studio
                     var doc = System.Text.Json.JsonDocument.Parse(json);
                     var root = doc.RootElement;
 
-                    // 기존 노드와 연결 삭제
-                    MainCanvas.Children.Clear();
-                    _connections.Clear();
-
-                    var loadedNodes = new List<NodeControl>();
-
-                    // 노드 복원
-                    if (root.TryGetProperty("nodes", out var nodesArray))
+                    // 파일 형식 자동 감지
+                    if (root.TryGetProperty("steps", out _))
                     {
-                        foreach (var nodeData in nodesArray.EnumerateArray())
-                        {
-                            string nodeType = nodeData.TryGetProperty("nodeType", out var nt) ? nt.GetString() ?? "" : "";
-                            string originalLabel = nodeData.TryGetProperty("originalLabel", out var ol) ? ol.GetString() ?? "" : "";
-                            double x = nodeData.TryGetProperty("x", out var xp) && xp.TryGetDouble(out var xd) ? xd : 0;
-                            double y = nodeData.TryGetProperty("y", out var yp) && yp.TryGetDouble(out var yd) ? yd : 0;
-                            string? jsonData = nodeData.TryGetProperty("jsonData", out var jd) ? jd.GetString() : null;
-
-                            // 노드 타입에 맞는 색상 결정
-                            Brush color = nodeType switch
-                            {
-                                "MOTION" => Brushes.CornflowerBlue,
-                                "WAIT" => Brushes.Orange,
-                                "SET_DO" => Brushes.LimeGreen,
-                                "CHECK_DI" => Brushes.Gold,
-                                "GOTO" => Brushes.IndianRed,
-                                "JUMP" => Brushes.MediumPurple,
-                                "START" => Brushes.LimeGreen,
-                                "END" => Brushes.Red,
-                                "LINEAR_MOVE" => Brushes.Blue,
-                                "REL_MOVE" => new SolidColorBrush(Color.FromRgb(0x1E, 0x88, 0xE5)), // Blue
-                                "CIRCULAR_MOVE" => new SolidColorBrush(Color.FromRgb(0x5E, 0x35, 0xB1)), // Purple
-                                "COUNTER" => new SolidColorBrush(Color.FromRgb(0xAB, 0x47, 0xBC)), // Purple
-                                _ => Brushes.Gray
-                            };
-
-                            bool hasInput = nodeType != "START";
-                            bool hasOutput = nodeType != "END";
-
-                            var node = new NodeControl(originalLabel, color, this, 16, 140, 48, hasInput, hasOutput, nodeType);
-                            node.JsonData = jsonData;
-                            Canvas.SetLeft(node, x);
-                            Canvas.SetTop(node, y);
-                            MainCanvas.Children.Add(node);
-                            loadedNodes.Add(node);
-                        }
+                        // JSON Sequence 형식 (.json - Export JSON/AI 생성)
+                        LoadSequenceJsonIntoCanvas(json);
+                        MessageBox.Show($"JSON 시퀀스를 불러왔습니다:\n{dlg.FileName}");
                     }
-
-                    // 레이아웃 업데이트를 강제로 수행하여 노드 위치가 확정되도록 함
-                    MainCanvas.UpdateLayout();
-
-                    // 연결 복원
-                    if (root.TryGetProperty("connections", out var connsArray))
+                    else if (root.TryGetProperty("nodes", out var nodesArray))
                     {
-                        foreach (var connData in connsArray.EnumerateArray())
-                        {
-                            int fromIdx = connData.TryGetProperty("fromNodeIndex", out var fi) && fi.TryGetInt32(out var fii) ? fii : -1;
-                            int toIdx = connData.TryGetProperty("toNodeIndex", out var ti) && ti.TryGetInt32(out var tii) ? tii : -1;
-
-                            if (fromIdx >= 0 && fromIdx < loadedNodes.Count && toIdx >= 0 && toIdx < loadedNodes.Count)
-                            {
-                                var fromNode = loadedNodes[fromIdx];
-                                var toNode = loadedNodes[toIdx];
-
-                                var conn = new Connection
-                                {
-                                    From = fromNode.OutputPortInfo,
-                                    To = toNode.InputPortInfo,
-                                    Path = new Path
-                                    {
-                                        Stroke = Brushes.Yellow,
-                                        StrokeThickness = 3,
-                                        IsHitTestVisible = true
-                                    }
-                                };
-                                conn.Path.MouseLeftButtonDown += (s, args) => { SelectConnection(conn); args.Handled = true; };
-                                MainCanvas.Children.Add(conn.Path);
-                                _connections.Add(conn);
-                                UpdateConnectionPath(conn);
-                            }
-                        }
+                        // EtherCAT Project 형식 (.ethercat)
+                        LoadEthercatProject(root, nodesArray);
+                        MessageBox.Show($"프로젝트를 불러왔습니다:\n{dlg.FileName}");
                     }
-
-                    MessageBox.Show($"프로젝트를 불러왔습니다:\n{dlg.FileName}");
+                    else
+                    {
+                        MessageBox.Show("지원하지 않는 파일 형식입니다.");
+                    }
                 }
                 catch (Exception ex)
                 {
                     MessageBox.Show($"불러오기 실패:\n{ex.Message}\n\n상세:\n{ex.StackTrace}");
+                }
+            }
+        }
+
+        private void LoadEthercatProject(System.Text.Json.JsonElement root, System.Text.Json.JsonElement nodesArray)
+        {
+            // 기존 노드와 연결 삭제
+            MainCanvas.Children.Clear();
+            _connections.Clear();
+
+            var loadedNodes = new List<NodeControl>();
+
+            // 노드 복원
+            foreach (var nodeData in nodesArray.EnumerateArray())
+            {
+                string nodeType = nodeData.TryGetProperty("nodeType", out var nt) ? nt.GetString() ?? "" : "";
+                string originalLabel = nodeData.TryGetProperty("originalLabel", out var ol) ? ol.GetString() ?? "" : "";
+                double x = nodeData.TryGetProperty("x", out var xp) && xp.TryGetDouble(out var xd) ? xd : 0;
+                double y = nodeData.TryGetProperty("y", out var yp) && yp.TryGetDouble(out var yd) ? yd : 0;
+                string? jsonData = nodeData.TryGetProperty("jsonData", out var jd) ? jd.GetString() : null;
+
+                // 노드 타입에 맞는 색상 결정
+                Brush color = nodeType switch
+                {
+                    "MOTION" => Brushes.CornflowerBlue,
+                    "ABS MOVE" => Brushes.CornflowerBlue,
+                    "WAIT" => Brushes.Orange,
+                    "SET_DO" => Brushes.LimeGreen,
+                    "CHECK_DI" => Brushes.Gold,
+                    "GOTO" => Brushes.IndianRed,
+                    "JUMP" => Brushes.MediumPurple,
+                    "START" => Brushes.LimeGreen,
+                    "END" => Brushes.Red,
+                    "LINEAR_MOVE" => Brushes.Blue,
+                    "REL_MOVE" => new SolidColorBrush(Color.FromRgb(0x1E, 0x88, 0xE5)),
+                    "CIRCULAR_MOVE" => new SolidColorBrush(Color.FromRgb(0x5E, 0x35, 0xB1)),
+                    "COUNTER" => new SolidColorBrush(Color.FromRgb(0xAB, 0x47, 0xBC)),
+                    _ => Brushes.Gray
+                };
+
+                bool hasInput = nodeType != "START";
+                bool hasOutput = nodeType != "END";
+
+                var node = new NodeControl(originalLabel, color, this, 16, 140, 48, hasInput, hasOutput, nodeType);
+                node.SetNodeNumber(loadedNodes.Count + 1);
+                node.JsonData = jsonData;
+                Canvas.SetLeft(node, x);
+                Canvas.SetTop(node, y);
+                MainCanvas.Children.Add(node);
+                loadedNodes.Add(node);
+            }
+
+            // 레이아웃 업데이트를 강제로 수행하여 노드 위치가 확정되도록 함
+            MainCanvas.UpdateLayout();
+
+            // 연결 복원
+            if (root.TryGetProperty("connections", out var connsArray))
+            {
+                foreach (var connData in connsArray.EnumerateArray())
+                {
+                    int fromIdx = connData.TryGetProperty("fromNodeIndex", out var fi) && fi.TryGetInt32(out var fii) ? fii : -1;
+                    int toIdx = connData.TryGetProperty("toNodeIndex", out var ti) && ti.TryGetInt32(out var tii) ? tii : -1;
+
+                    if (fromIdx >= 0 && fromIdx < loadedNodes.Count && toIdx >= 0 && toIdx < loadedNodes.Count)
+                    {
+                        var fromNode = loadedNodes[fromIdx];
+                        var toNode = loadedNodes[toIdx];
+
+                        var conn = new Connection
+                        {
+                            From = fromNode.OutputPortInfo,
+                            To = toNode.InputPortInfo,
+                            Path = new Path
+                            {
+                                Stroke = Brushes.Yellow,
+                                StrokeThickness = 3,
+                                IsHitTestVisible = true
+                            }
+                        };
+                        conn.Path.MouseLeftButtonDown += (s, args) => { SelectConnection(conn); args.Handled = true; };
+                        MainCanvas.Children.Add(conn.Path);
+                        _connections.Add(conn);
+                        UpdateConnectionPath(conn);
+                    }
                 }
             }
         }
@@ -503,9 +524,9 @@ namespace EtherCAT_Studio
                 string originalType = (node.NodeType ?? "").ToUpperInvariant();
                 string type = originalType switch
                 {
-                    "MOTION" => "MOTION",
-                    "M" => "MOTION",
-                    "ABS MOVE" => "MOTION",
+                    "M" => "ABS MOVE",
+                    "ABS MOVE" => "ABS MOVE",
+                    "MOTION" => "ABS MOVE",  // 호환성: 기존 MOTION을 ABS MOVE로 변환
                     "WAIT" => "WAIT",
                     "IO" => "IO",
                     "SET DO" => "IO",
@@ -518,6 +539,7 @@ namespace EtherCAT_Studio
                     "LINEAR MOVE" => "LINEAR_MOVE",
                     "LINEAR_MOVE" => "LINEAR_MOVE",
                     "REL_MOVE" => "REL_MOVE",
+                    "REL MOVE" => "REL_MOVE",  // 호환성
                     "CIRCULAR_MOVE" => "CIRCULAR_MOVE",
                     "COUNTER" => "COUNTER",
                     "SYSTEM" => "SYSTEM",
@@ -549,7 +571,7 @@ namespace EtherCAT_Studio
                                 return def;
                             }
 
-                            if (type == "MOTION")
+                            if (type == "ABS MOVE")
                             {
                                 string axis = GetPropString(root, "axis", "X");
                                 double pos = 0;
@@ -1174,17 +1196,34 @@ namespace EtherCAT_Studio
             {
                 try
                 {
-                    LoadSequenceJsonIntoCanvas(promptControl.GeneratedJson);
+                    // JSON 프리뷰 창 띄우기
+                    var previewWindow = new JSONPreviewWindow(promptControl.GeneratedJson)
+                    {
+                        Owner = this
+                    };
+                    previewWindow.ShowDialog();
+
+                    // 사용자 선택에 따라 처리
+                    if (previewWindow.IsConverted)
+                    {
+                        LoadSequenceJsonIntoCanvas(promptControl.GeneratedJson);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"노드 생성 실패: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show($"처리 실패: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
 
         private void LoadSequenceJsonIntoCanvas(string jsonStr)
         {
+            // 기존 노드와 연결선 모두 삭제
+            MainCanvas.Children.Clear();
+            _connections.Clear();
+            _selectedNode = null;
+            _selectedConnection = null;
+
             using var doc = JsonDocument.Parse(jsonStr);
             var root = doc.RootElement;
 
@@ -1201,8 +1240,13 @@ namespace EtherCAT_Studio
                     try
                     {
                         string type = stepData.TryGetProperty("type", out var typeEl) 
-                            ? typeEl.GetString() ?? "MOTION" 
-                            : "MOTION";
+                            ? typeEl.GetString() ?? "ABS MOVE" 
+                            : "ABS MOVE";
+                        
+                        // 호환성: 기존 "MOTION" 타입을 "ABS MOVE"로 변환
+                        if (type == "MOTION")
+                            type = "ABS MOVE";
+                        
                         string? stepId = stepData.TryGetProperty("id", out var idEl)
                             ? idEl.GetString()
                             : null;
@@ -1215,7 +1259,8 @@ namespace EtherCAT_Studio
                         // 노드 타입에 맞는 색상 결정
                         Brush color = type switch
                         {
-                            "MOTION" => Brushes.CornflowerBlue,
+                            "ABS MOVE" => Brushes.CornflowerBlue,
+                            "REL MOVE" => new SolidColorBrush(Color.FromRgb(0x1E, 0x88, 0xE5)),
                             "WAIT" => Brushes.Orange,
                             "SET_DO" => Brushes.LimeGreen,
                             "CHECK_DI" => Brushes.Gold,
@@ -1224,7 +1269,6 @@ namespace EtherCAT_Studio
                             "START" => Brushes.LimeGreen,
                             "END" => Brushes.Red,
                             "LINEAR_MOVE" => Brushes.Blue,
-                            "REL_MOVE" => new SolidColorBrush(Color.FromRgb(0x1E, 0x88, 0xE5)),
                             "CIRCULAR_MOVE" => new SolidColorBrush(Color.FromRgb(0x5E, 0x35, 0xB1)),
                             "COUNTER" => new SolidColorBrush(Color.FromRgb(0xAB, 0x47, 0xBC)),
                             _ => Brushes.Gray
@@ -1238,6 +1282,7 @@ namespace EtherCAT_Studio
                             JsonData = jsonDataStr
                         };
                         node.Label.Text = type;
+                        node.SetNodeNumber(nodeCount + 1);
 
                         // 자동 배치 (위에서 아래로, 열 3개)
                         Canvas.SetLeft(node, 100 + (nodeCount % 3) * 220);

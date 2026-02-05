@@ -34,10 +34,10 @@ namespace EtherCAT_Studio
             }
 
             // node-specific control will be created below and initialized from JSON if provided
-            // host appropriate control. For a MOTION node with label "ABS MOVE" use the specialized AbsMoveControl
+            // host appropriate control. For an ABS MOVE node use the specialized AbsMoveControl
             UserControl nodeControl;
-            if ("MOTION".Equals(_nodeType, System.StringComparison.OrdinalIgnoreCase)
-                && "ABS MOVE".Equals(_nodeLabel, System.StringComparison.OrdinalIgnoreCase))
+            if ("ABS MOVE".Equals(_nodeLabel, System.StringComparison.OrdinalIgnoreCase)
+                || "ABS MOVE".Equals(_nodeType, System.StringComparison.OrdinalIgnoreCase))
             {
                 nodeControl = new AbsMoveControl();
             }
@@ -45,6 +45,7 @@ namespace EtherCAT_Studio
             {
                 nodeControl = (_nodeType ?? "").ToUpperInvariant() switch
                 {
+                    "ABS MOVE" => new AbsMoveControl(),
                     "LINEAR_MOVE" => new LinearMoveControl(),
                     "REL_MOVE" => new RelMoveControl(),
                     "CIRCULAR_MOVE" => new CircularMoveControl(),
@@ -87,7 +88,17 @@ namespace EtherCAT_Studio
                 catch { }
                 try
                 {
-                    bool isAbsMove = ("MOTION".Equals(_nodeType, System.StringComparison.OrdinalIgnoreCase)
+                    var doc = System.Text.Json.JsonDocument.Parse(initialJson);
+                    var root = doc.RootElement;
+                    
+                    // AI 생성 JSON은 params 필드에 데이터를 포함하므로 추출
+                    JsonElement dataToLoad = root;
+                    if (root.TryGetProperty("params", out var paramsEl))
+                    {
+                        dataToLoad = paramsEl;
+                    }
+                    
+                    bool isAbsMove = ("ABS MOVE".Equals(_nodeType, System.StringComparison.OrdinalIgnoreCase)
                         && "ABS MOVE".Equals(_nodeLabel, System.StringComparison.OrdinalIgnoreCase));
                     if (isAbsMove)
                     {
@@ -105,8 +116,6 @@ namespace EtherCAT_Studio
                         catch { }
                     }
 
-                    var doc = System.Text.Json.JsonDocument.Parse(initialJson);
-                    var root = doc.RootElement;
                     // populate common fields (label, comment) so they persist
                     try
                     {
@@ -114,46 +123,56 @@ namespace EtherCAT_Studio
                         {
                             LabelBox.Text = lbl.GetString() ?? string.Empty;
                         }
-                        else if (root.TryGetProperty("name", out var namep) && namep.ValueKind == System.Text.Json.JsonValueKind.String)
+                        else if (dataToLoad.TryGetProperty("label", out var lbl2) && lbl2.ValueKind == System.Text.Json.JsonValueKind.String)
                         {
-                            LabelBox.Text = namep.GetString() ?? string.Empty;
+                            LabelBox.Text = lbl2.GetString() ?? string.Empty;
                         }
+                        
                         if (root.TryGetProperty("jump_target", out var jt) && jt.ValueKind == System.Text.Json.JsonValueKind.String)
                         {
                             JumpTargetBox.Text = jt.GetString() ?? string.Empty;
+                        }
+                        else if (dataToLoad.TryGetProperty("jump_target", out var jt2) && jt2.ValueKind == System.Text.Json.JsonValueKind.String)
+                        {
+                            JumpTargetBox.Text = jt2.GetString() ?? string.Empty;
                         }
                         else if (root.TryGetProperty("comment", out var com) && com.ValueKind == System.Text.Json.JsonValueKind.String)
                         {
                             JumpTargetBox.Text = com.GetString() ?? string.Empty;
                         }
+                        else if (dataToLoad.TryGetProperty("comment", out var com2) && com2.ValueKind == System.Text.Json.JsonValueKind.String)
+                        {
+                            JumpTargetBox.Text = com2.GetString() ?? string.Empty;
+                        }
                     }
                     catch { }
-                    // call Load if available
+                    
+                    // call Load if available - params 데이터 사용
                     switch (nodeControl)
                     {
                         case LinearMoveControl lmc:
-                            lmc.Load(root);
+                            lmc.Load(dataToLoad);
                             break;
                         case RelMoveControl rmc:
-                            rmc.Load(root);
+                            rmc.Load(dataToLoad);
                             break;
                         case CircularMoveControl cmc:
-                            cmc.Load(root);
+                            cmc.Load(dataToLoad);
                             break;
                         case AbsMoveControl amc:
-                            amc.Load(root);
+                            amc.Load(dataToLoad);
                             break;
                         case WaitControl wc:
-                            wc.Load(root);
+                            wc.Load(dataToLoad);
                             break;
                         case CounterControl cc:
-                            cc.Load(root);
+                            cc.Load(dataToLoad);
                             break;
                         case GotoControl gc:
-                            gc.Load(root);
+                            gc.Load(dataToLoad);
                             break;
                         case GenericControl gn:
-                            gn.Load(root);
+                            gn.Load(dataToLoad);
                             break;
                     }
                 }
@@ -166,7 +185,7 @@ namespace EtherCAT_Studio
             var obj = new Dictionary<string, object>();
             string label = LabelBox.Text ?? string.Empty;
             string comment = JumpTargetBox.Text ?? string.Empty;
-            bool isAbsMove = ("MOTION".Equals(_nodeType, System.StringComparison.OrdinalIgnoreCase)
+            bool isAbsMove = ("ABS MOVE".Equals(_nodeType, System.StringComparison.OrdinalIgnoreCase)
                 && "ABS MOVE".Equals(_nodeLabel, System.StringComparison.OrdinalIgnoreCase));
             // Include label normally; for ABS MOVE we'll also emit the label inside the ABS JSON
             if (!string.IsNullOrWhiteSpace(label)) obj["label"] = label;

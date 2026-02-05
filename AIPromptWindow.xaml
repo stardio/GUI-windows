@@ -1,22 +1,26 @@
 <UserControl x:Class="EtherCAT_Studio.AIPromptWindow"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Height="300" Width="600" Background="#1E1E1E">
+             Height="350" Width="600" Background="#1E1E1E">
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="AI 프롬프트로 시퀀스 생성" Foreground="White" FontSize="16" FontWeight="Bold" Margin="12"/>
+        <TextBlock Grid.Row="0" Text="AI 프롬프트로 시퀀스 생성" Foreground="White" FontSize="16" FontWeight="Bold" Margin="12,12,12,6"/>
 
-        <TextBox x:Name="PromptInput" Grid.Row="1" Margin="12" Background="#2D2D2D" Foreground="White" 
+        <TextBlock Grid.Row="1" Text="💡 절대좌표(목표값): &quot;X를 1000으로&quot; | 상대좌표(거리): &quot;X축으로 500 이동&quot; | 대기: &quot;2초 대기&quot;" 
+                   Foreground="#AAAAAA" FontSize="10" Margin="12,0,12,6" TextWrapping="Wrap"/>
+
+        <TextBox x:Name="PromptInput" Grid.Row="2" Margin="12" Background="#2D2D2D" Foreground="White" 
                  FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
                  Padding="8" AcceptsReturn="True" 
-                 Text="X축을 1000펄스 500속도로 이동하고, 2초 대기, Y축을 500펄스 300속도로 상대이동해줘"/>
+                 Text="X축을 1000펄스 500속도로 이동하고, 2초 대기, Y축으로 500 이동"/>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="12">
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="12">
             <Button x:Name="GenerateBtn" Content="생성" Background="#0078D4" Foreground="White" Padding="16,8" Margin="4" Click="GenerateBtn_Click"/>
             <Button x:Name="CancelBtn" Content="취소" Background="#6C757D" Foreground="White" Padding="16,8" Margin="4" Click="CancelBtn_Click"/>
         </StackPanel>

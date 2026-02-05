@@ -3,36 +3,36 @@
     {
       "nodeType": "START",
       "originalLabel": "START",
-      "x": 57.333333333333314,
-      "y": 23.333333333333343,
+      "x": 100,
+      "y": 50,
       "jsonData": "{}"
     },
     {
       "nodeType": "ABS MOVE",
       "originalLabel": "ABS MOVE",
-      "x": 229.33333333333331,
-      "y": 158.66666666666666,
+      "x": 320,
+      "y": 50,
       "jsonData": "{\r\n        \u0022axis\u0022: \u0022X\u0022,\r\n        \u0022pos\u0022: \u00221000\u0022,\r\n        \u0022speed\u0022: \u0022500\u0022\r\n      }"
     },
     {
       "nodeType": "WAIT",
       "originalLabel": "WAIT",
-      "x": 397.33333333333326,
-      "y": 31.333333333333343,
+      "x": 540,
+      "y": 50,
       "jsonData": "{\r\n        \u0022delay_ms\u0022: \u00222000\u0022\r\n      }"
     },
     {
       "nodeType": "REL_MOVE",
       "originalLabel": "REL_MOVE",
-      "x": 589.3333333333333,
-      "y": 124.00000000000006,
+      "x": 100,
+      "y": 200,
       "jsonData": "{\r\n        \u0022axis\u0022: \u0022Y\u0022,\r\n        \u0022distance\u0022: \u0022500\u0022,\r\n        \u0022speed\u0022: \u0022300\u0022\r\n      }"
     },
     {
       "nodeType": "END",
       "originalLabel": "END",
-      "x": 632.6666666666666,
-      "y": 371.99999999999994,
+      "x": 320,
+      "y": 200,
       "jsonData": "{}"
     }
   ],

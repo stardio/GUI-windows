@@ -1,5 +1,5 @@
 {
-  "sequence_name": "X\uCD95 \uC774\uB3D9",
+  "sequence_name": "Sequence",
   "steps": [
     {
       "id": "node_01",
@@ -12,8 +12,8 @@
       "type": "ABS MOVE",
       "params": {
         "axis": "X",
-        "pos": "1000",
-        "speed": "500"
+        "pos": 1000,
+        "speed": 500
       },
       "next": "node_03"
     },
@@ -21,7 +21,7 @@
       "id": "node_03",
       "type": "WAIT",
       "params": {
-        "delay_ms": "2000"
+        "delay_ms": 2000
       },
       "next": "node_04"
     },
@@ -30,8 +30,8 @@
       "type": "REL_MOVE",
       "params": {
         "axis": "Y",
-        "distance": "500",
-        "speed": "300"
+        "distance": 500,
+        "speed": 300
       },
       "next": "node_05"
     },

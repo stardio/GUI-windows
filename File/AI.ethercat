@@ -1,0 +1,46 @@
+{
+  "nodes": [
+    {
+      "nodeType": "START",
+      "originalLabel": "START",
+      "x": 75.33333333333337,
+      "y": 42,
+      "jsonData": "{}"
+    },
+    {
+      "nodeType": "ABS MOVE",
+      "originalLabel": "ABS MOVE",
+      "x": 270.00000000000006,
+      "y": 250,
+      "jsonData": "{\r\n        \u0022axis\u0022: \u0022X\u0022,\r\n        \u0022pos\u0022: \u00221000\u0022,\r\n        \u0022speed\u0022: \u0022500\u0022\r\n      }"
+    },
+    {
+      "nodeType": "COUNTER",
+      "originalLabel": "COUNTER",
+      "x": 484.66666666666663,
+      "y": 87.99999999999999,
+      "jsonData": "{\r\n        \u0022name\u0022: \u0022cnt1\u0022,\r\n        \u0022initial\u0022: \u00220\u0022,\r\n        \u0022target\u0022: \u002210\u0022,\r\n        \u0022increment\u0022: \u00221\u0022,\r\n        \u0022gotoNode\u0022: \u0022node_01\u0022\r\n      }"
+    },
+    {
+      "nodeType": "END",
+      "originalLabel": "END",
+      "x": 584.6666666666666,
+      "y": 278,
+      "jsonData": "{}"
+    }
+  ],
+  "connections": [
+    {
+      "fromNodeIndex": 0,
+      "toNodeIndex": 1
+    },
+    {
+      "fromNodeIndex": 1,
+      "toNodeIndex": 2
+    },
+    {
+      "fromNodeIndex": 2,
+      "toNodeIndex": 3
+    }
+  ]
+}
