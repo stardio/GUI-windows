@@ -19,7 +19,7 @@
         "type": {
           "type": "string",
           "enum": [
-            "MOTION",
+            "ABS MOVE",
             "WAIT",
             "IO",
             "FLOW",
@@ -35,7 +35,7 @@
         "params": {
           "type": "object",
           "oneOf": [
-            { "$ref": "#/definitions/motionParams" },
+            { "$ref": "#/definitions/absMoveParams" },
             { "$ref": "#/definitions/waitParams" },
             { "$ref": "#/definitions/linearMoveParams" },
             { "$ref": "#/definitions/relMoveParams" },
@@ -49,7 +49,7 @@
       },
       "additionalProperties": false
     },
-    "motionParams": {
+    "absMoveParams": {
       "type": "object",
       "required": ["axis", "pos", "speed"],
       "properties": {

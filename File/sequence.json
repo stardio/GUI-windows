@@ -1,0 +1,39 @@
+{
+  "sequence_name": "Sequence",
+  "steps": [
+    {
+      "id": "node_01",
+      "type": "START",
+      "params": {},
+      "next": "node_02"
+    },
+    {
+      "id": "node_02",
+      "type": "ABS MOVE",
+      "params": {
+        "axis": "X",
+        "pos": 1000,
+        "speed": 500
+      },
+      "next": "node_03"
+    },
+    {
+      "id": "node_03",
+      "type": "COUNTER",
+      "params": {
+        "name": "cnt1",
+        "initial": 0,
+        "target": 10,
+        "increment": 1,
+        "gotoNode": "node_01"
+      },
+      "next": "node_04"
+    },
+    {
+      "id": "node_04",
+      "type": "END",
+      "params": {},
+      "next": null
+    }
+  ]
+}

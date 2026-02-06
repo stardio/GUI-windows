@@ -53,6 +53,7 @@
             </MenuItem>
             <MenuItem Header="도구" Foreground="White">
                 <MenuItem Header="Run Sequence" Click="RunSequence_Click"/>
+                <MenuItem Header="3D Simulation" Click="RunSimulation_Click"/>
             </MenuItem>
         </Menu>
 
@@ -64,7 +65,7 @@
             </Grid.ColumnDefinitions>
             <!-- Toolbox -->
             <StackPanel Grid.Column="0" Background="#232323" Orientation="Vertical" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Width="150">
-                <Button Content="ABS MOVE" ToolTip="위치 제어 (절대 이동)" Background="#2176FF" Foreground="White" FontSize="14" Click="AddMotionNode_Click" Style="{StaticResource ToolButtonStyle}"/>
+                <Button Content="ABS MOVE" ToolTip="위치 제어 (절대 이동)" Background="#2176FF" Foreground="White" FontSize="14" Click="AddAbsMoveNode_Click" Style="{StaticResource ToolButtonStyle}"/>
                 <Button Content="REL MOVE" ToolTip="상대 이동" Background="#1E88E5" Foreground="White" FontSize="14" Click="AddRelMoveNode_Click" Style="{StaticResource ToolButtonStyle}"/>
                 <Button Content="LINEAR MOVE" ToolTip="선형 이동" Background="#3B82F6" Foreground="White" FontSize="14" Click="AddLinearMoveNode_Click" Style="{StaticResource ToolButtonStyle}"/>
                 <Button Content="CIRCULAR MOVE" ToolTip="원호 이동" Background="#5E35B1" Foreground="White" FontSize="12" Click="AddCircularMoveNode_Click" Style="{StaticResource ToolButtonStyle}"/>
@@ -82,6 +83,7 @@
                 <Separator Margin="6,12,6,12" Background="#444"/>
                 <Button Content="Export JSON" ToolTip="JSON 내보내기" Background="#6366F1" Foreground="White" FontSize="14" Click="SaveJson_Click" Style="{StaticResource ToolButtonStyle}"/>
                 <Button Content="Run Sequence" ToolTip="시퀀스 실행 (시뮬레이션)" Background="#28A745" Foreground="White" FontSize="14" Click="RunSequence_Click" Style="{StaticResource ToolButtonStyle}"/>
+                <Button Content="3D Simulation" ToolTip="3D 시뮬레이션" Background="#00A3FF" Foreground="White" FontSize="14" Click="RunSimulation_Click" Style="{StaticResource ToolButtonStyle}"/>
             </StackPanel>
             <!-- Main Canvas with Scrolling -->
             <ScrollViewer Grid.Column="1" Background="#232323" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">

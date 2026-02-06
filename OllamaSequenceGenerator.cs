@@ -297,7 +297,7 @@ JSON만 출력하세요. 설명은 금지.
                 // 필드명 정규화
                 string normalizedKey = key switch
                 {
-                    // MOTION/REL_MOVE 관련
+                    // ABS MOVE/REL_MOVE 관련
                     "pos" or "position" or "target_position" => "pos",
                     "axis" => "axis",
                     "speed" => "speed",

@@ -2,6 +2,7 @@
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using System.Windows.Shapes;
 using System.Text.Json;
 
@@ -37,6 +38,51 @@ namespace EtherCAT_Studio
             InitializeComponent();
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
             MainCanvas.MouseLeftButtonDown += MainCanvas_MouseLeftButtonDown_ClearSelection;
+            Loaded += MainWindow_Loaded;
+            Closing += MainWindow_Closing;
+        }
+
+        private static string GetAppDataDir()
+        {
+            var dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EtherCAT_Studio");
+            System.IO.Directory.CreateDirectory(dir);
+            return dir;
+        }
+
+        private static string GetLastSessionPath()
+        {
+            return System.IO.Path.Combine(GetAppDataDir(), "last_session.ethercat");
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            var path = GetLastSessionPath();
+            if (!System.IO.File.Exists(path)) return;
+
+            try
+            {
+                var json = System.IO.File.ReadAllText(path);
+                LoadProjectFromJson(json);
+            }
+            catch
+            {
+                // ignore restore errors
+            }
+        }
+
+        private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+        {
+            try
+            {
+                if (MainCanvas.Children.OfType<NodeControl>().Any())
+                {
+                    SaveProjectToPath(GetLastSessionPath());
+                }
+            }
+            catch
+            {
+                // ignore autosave errors
+            }
         }
 
         private void MainCanvas_MouseLeftButtonDown_ClearSelection(object? sender, MouseButtonEventArgs e)
@@ -116,9 +162,9 @@ namespace EtherCAT_Studio
             }
         }
 
-        private void AddMotionNode_Click(object sender, RoutedEventArgs e)
+        private void AddAbsMoveNode_Click(object sender, RoutedEventArgs e)
         {
-            AddNode("ABS MOVE", Brushes.CornflowerBlue, nodeType: "MOTION");
+            AddNode("ABS MOVE", Brushes.CornflowerBlue, nodeType: "ABS MOVE");
         }
 
         private void AddWaitNode_Click(object sender, RoutedEventArgs e)
@@ -318,25 +364,7 @@ namespace EtherCAT_Studio
             {
                 try
                 {
-                    var projectData = new
-                    {
-                        nodes = MainCanvas.Children.OfType<NodeControl>().Select(n => new
-                        {
-                            nodeType = n.NodeType,
-                            originalLabel = n.OriginalLabel,
-                            x = Canvas.GetLeft(n),
-                            y = Canvas.GetTop(n),
-                            jsonData = n.JsonData
-                        }).ToList(),
-                        connections = _connections.Select(c => new
-                        {
-                            fromNodeIndex = c.From?.Node != null ? MainCanvas.Children.OfType<NodeControl>().ToList().IndexOf(c.From.Node) : -1,
-                            toNodeIndex = c.To?.Node != null ? MainCanvas.Children.OfType<NodeControl>().ToList().IndexOf(c.To.Node) : -1
-                        }).Where(c => c.fromNodeIndex >= 0 && c.toNodeIndex >= 0).ToList()
-                    };
-
-                    var json = System.Text.Json.JsonSerializer.Serialize(projectData, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-                    System.IO.File.WriteAllText(dlg.FileName, json);
+                    SaveProjectToPath(dlg.FileName);
                     MessageBox.Show($"프로젝트를 저장했습니다:\n{dlg.FileName}");
                 }
                 catch (Exception ex)
@@ -408,7 +436,6 @@ namespace EtherCAT_Studio
                 // 노드 타입에 맞는 색상 결정
                 Brush color = nodeType switch
                 {
-                    "MOTION" => Brushes.CornflowerBlue,
                     "ABS MOVE" => Brushes.CornflowerBlue,
                     "WAIT" => Brushes.Orange,
                     "SET_DO" => Brushes.LimeGreen,
@@ -472,6 +499,40 @@ namespace EtherCAT_Studio
             }
         }
 
+        private void SaveProjectToPath(string filePath)
+        {
+            var nodesList = MainCanvas.Children.OfType<NodeControl>().ToList();
+            var projectData = new
+            {
+                nodes = nodesList.Select(n => new
+                {
+                    nodeType = n.NodeType,
+                    originalLabel = n.OriginalLabel,
+                    x = Canvas.GetLeft(n),
+                    y = Canvas.GetTop(n),
+                    jsonData = n.JsonData
+                }).ToList(),
+                connections = _connections.Select(c => new
+                {
+                    fromNodeIndex = c.From?.Node != null ? nodesList.IndexOf(c.From.Node) : -1,
+                    toNodeIndex = c.To?.Node != null ? nodesList.IndexOf(c.To.Node) : -1
+                }).Where(c => c.fromNodeIndex >= 0 && c.toNodeIndex >= 0).ToList()
+            };
+
+            var json = System.Text.Json.JsonSerializer.Serialize(projectData, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            System.IO.File.WriteAllText(filePath, json);
+        }
+
+        private void LoadProjectFromJson(string json)
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("nodes", out var nodesArray))
+            {
+                LoadEthercatProject(root, nodesArray);
+            }
+        }
+
         // 저장 버튼 클릭 시 모든 노드를 시퀀스 JSON 구조로 파일로 저장
         private void SaveJson_Click(object sender, RoutedEventArgs e)
         {
@@ -524,9 +585,7 @@ namespace EtherCAT_Studio
                 string originalType = (node.NodeType ?? "").ToUpperInvariant();
                 string type = originalType switch
                 {
-                    "M" => "ABS MOVE",
                     "ABS MOVE" => "ABS MOVE",
-                    "MOTION" => "ABS MOVE",  // 호환성: 기존 MOTION을 ABS MOVE로 변환
                     "WAIT" => "WAIT",
                     "IO" => "IO",
                     "SET DO" => "IO",
@@ -821,9 +880,7 @@ namespace EtherCAT_Studio
                 string originalType = (node.NodeType ?? "").ToUpperInvariant();
                 string type = originalType switch
                 {
-                    "MOTION" => "MOTION",
-                    "M" => "MOTION",
-                    "ABS MOVE" => "MOTION",
+                    "ABS MOVE" => "ABS MOVE",
                     "WAIT" => "WAIT",
                     "IO" => "IO",
                     "SET DO" => "IO",
@@ -886,7 +943,7 @@ namespace EtherCAT_Studio
 
                         var paramPairs = new List<(string key, object value)>();
 
-                        if (type == "MOTION")
+                        if (type == "ABS MOVE")
                         {
                             string axis = GetPropString(root, "axis", "");
                             double pos = 0;
@@ -937,9 +994,9 @@ namespace EtherCAT_Studio
                                 }
                             }
                             
-                            if (string.IsNullOrEmpty(axis)) warnings.Add($"MOTION {nodeId}: Missing 'axis'");
-                            if (pos == 0) warnings.Add($"MOTION {nodeId}: position is 0");
-                            if (speed == 0) warnings.Add($"MOTION {nodeId}: speed is 0");
+                            if (string.IsNullOrEmpty(axis)) warnings.Add($"ABS MOVE {nodeId}: Missing 'axis'");
+                            if (pos == 0) warnings.Add($"ABS MOVE {nodeId}: position is 0");
+                            if (speed == 0) warnings.Add($"ABS MOVE {nodeId}: speed is 0");
                             
                             paramPairs.Add(("axis", axis));
                             paramPairs.Add(("position", pos));
@@ -1161,12 +1218,232 @@ namespace EtherCAT_Studio
 
             output.AppendLine("\n" + new string('=', 65));
 
+            // 3D 시뮬레이션: 궤적 생성 및 표시
+            var simulationData = BuildSimulationData(nodes);
+            if (simulationData.Points.Count > 1)
+            {
+                var simWindow = new SimulationWindow
+                {
+                    Owner = this
+                };
+                simWindow.SetSimulationData(simulationData.Points, simulationData.PointStepIndex, simulationData.Steps);
+                simWindow.Show();
+            }
+
             // Show debug output in popup window
             var debugWindow = new DebugOutputWindow(output.ToString())
             {
                 Owner = this
             };
             debugWindow.ShowDialog();
+        }
+
+        private void RunSimulation_Click(object sender, RoutedEventArgs e)
+        {
+            var allNodes = new List<NodeControl>();
+            foreach (var child in MainCanvas.Children)
+            {
+                if (child is NodeControl node)
+                    allNodes.Add(node);
+            }
+            if (allNodes.Count == 0)
+            {
+                MessageBox.Show("No nodes to simulate.");
+                return;
+            }
+
+            // Find START node and build sequence based on connections
+            var startNode = allNodes.FirstOrDefault(n => n.NodeType == "START");
+            var nodes = new List<NodeControl>();
+            if (startNode != null)
+            {
+                var current = startNode;
+                var visited = new HashSet<NodeControl>();
+                while (current != null && !visited.Contains(current))
+                {
+                    visited.Add(current);
+                    nodes.Add(current);
+                    var nextConn = _connections.FirstOrDefault(c => c.From?.Node == current);
+                    current = nextConn?.To?.Node;
+                }
+                foreach (var node in allNodes.Where(n => !visited.Contains(n)))
+                {
+                    nodes.Add(node);
+                }
+            }
+            else
+            {
+                nodes = allNodes;
+            }
+
+            var simulationData = BuildSimulationData(nodes);
+            if (simulationData.Points.Count > 1)
+            {
+                var simWindow = new SimulationWindow
+                {
+                    Owner = this
+                };
+                simWindow.SetSimulationData(simulationData.Points, simulationData.PointStepIndex, simulationData.Steps);
+                simWindow.Show();
+            }
+            else
+            {
+                MessageBox.Show("시뮬레이션할 이동 경로가 없습니다.");
+            }
+        }
+
+        private class SimulationData
+        {
+            public List<Point3D> Points { get; } = new();
+            public List<int> PointStepIndex { get; } = new();
+            public List<SimulationWindow.SimulationStep> Steps { get; } = new();
+        }
+
+        private SimulationData BuildSimulationData(List<NodeControl> nodes)
+        {
+            var data = new SimulationData();
+            double x = 0, y = 0, z = 0;
+            data.Points.Add(new Point3D(x, y, z));
+            data.PointStepIndex.Add(-1);
+
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                var node = nodes[i];
+                string id = node.NodeNumber > 0 ? $"node_{node.NodeNumber:00}" : $"node_{i + 1:00}";
+                string type = (node.NodeType ?? string.Empty).ToUpperInvariant();
+                string json = string.IsNullOrWhiteSpace(node.JsonData) ? "{}" : node.JsonData;
+                data.Steps.Add(new SimulationWindow.SimulationStep { Id = id, Type = type, Json = json });
+            }
+
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                var node = nodes[i];
+                var type = (node.NodeType ?? string.Empty).ToUpperInvariant();
+                if (type == "LINEAR MOVE") type = "LINEAR_MOVE";
+                if (type == "REL MOVE") type = "REL_MOVE";
+
+                if (string.IsNullOrWhiteSpace(node.JsonData))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(node.JsonData);
+                    var root = doc.RootElement;
+
+                    static double GetNumber(System.Text.Json.JsonElement el)
+                    {
+                        if (el.ValueKind == System.Text.Json.JsonValueKind.Number && el.TryGetDouble(out var d)) return d;
+                        if (el.ValueKind == System.Text.Json.JsonValueKind.String && double.TryParse(el.GetString(), out var s)) return s;
+                        if (el.ValueKind == System.Text.Json.JsonValueKind.Object && el.TryGetProperty("value", out var v)) return GetNumber(v);
+                        return 0;
+                    }
+
+                    static double GetPropNumber(System.Text.Json.JsonElement el, params string[] names)
+                    {
+                        foreach (var name in names)
+                        {
+                            if (el.TryGetProperty(name, out var p))
+                            {
+                                return GetNumber(p);
+                            }
+                        }
+                        return 0;
+                    }
+
+                    static string GetPropString(System.Text.Json.JsonElement el, string name, string def)
+                    {
+                        if (!el.TryGetProperty(name, out var p)) return def;
+                        if (p.ValueKind == System.Text.Json.JsonValueKind.String) return p.GetString() ?? def;
+                        var raw = p.GetRawText();
+                        return string.IsNullOrWhiteSpace(raw) ? def : raw.Trim('"');
+                    }
+
+                    if (type == "ABS MOVE")
+                    {
+                        string axis = GetPropString(root, "axis", "X").ToUpperInvariant();
+                        double pos = GetPropNumber(root, "target_position", "position", "pos");
+
+                        if (axis.Contains("X")) x = pos;
+                        else if (axis.Contains("Y")) y = pos;
+                        else if (axis.Contains("Z")) z = pos;
+
+                        data.Points.Add(new Point3D(x, y, z));
+                        data.PointStepIndex.Add(i);
+                    }
+                    else if (type == "REL_MOVE")
+                    {
+                        string axis = GetPropString(root, "axis", "X").ToUpperInvariant();
+                        double dist = GetPropNumber(root, "distance");
+
+                        if (axis.Contains("X")) x += dist;
+                        else if (axis.Contains("Y")) y += dist;
+                        else if (axis.Contains("Z")) z += dist;
+
+                        data.Points.Add(new Point3D(x, y, z));
+                        data.PointStepIndex.Add(i);
+                    }
+                    else if (type == "LINEAR_MOVE")
+                    {
+                        if (root.TryGetProperty("target", out var t))
+                        {
+                            x = GetPropNumber(t, "X");
+                            y = GetPropNumber(t, "Y");
+                            z = GetPropNumber(t, "Z");
+                            data.Points.Add(new Point3D(x, y, z));
+                            data.PointStepIndex.Add(i);
+                        }
+                    }
+                    else if (type == "CIRCULAR_MOVE")
+                    {
+                        if (root.TryGetProperty("center", out var c) && root.TryGetProperty("end", out var end))
+                        {
+                            double cx = GetPropNumber(c, "X");
+                            double cy = GetPropNumber(c, "Y");
+                            double ex = GetPropNumber(end, "X");
+                            double ey = GetPropNumber(end, "Y");
+
+                            string dir = GetPropString(root, "direction", "CW").ToUpperInvariant();
+                            double startAngle = Math.Atan2(y - cy, x - cx);
+                            double endAngle = Math.Atan2(ey - cy, ex - cx);
+                            double radius = Math.Sqrt(Math.Pow(x - cx, 2) + Math.Pow(y - cy, 2));
+
+                            if (radius > 0.0001)
+                            {
+                                if (dir == "CW")
+                                {
+                                    if (endAngle > startAngle) endAngle -= Math.PI * 2;
+                                }
+                                else
+                                {
+                                    if (endAngle < startAngle) endAngle += Math.PI * 2;
+                                }
+
+                                int steps = 30;
+                                for (int j = 1; j <= steps; j++)
+                                {
+                                    double t = j / (double)steps;
+                                    double a = startAngle + (endAngle - startAngle) * t;
+                                    double px = cx + radius * Math.Cos(a);
+                                    double py = cy + radius * Math.Sin(a);
+                                    data.Points.Add(new Point3D(px, py, z));
+                                    data.PointStepIndex.Add(i);
+                                }
+                            }
+
+                            x = ex;
+                            y = ey;
+                        }
+                    }
+                }
+                catch
+                {
+                    // ignore parse errors for simulation path
+                }
+            }
+
+            return data;
         }
 
         // =============== AI SEQUENCE GENERATION ===============
@@ -1242,10 +1519,6 @@ namespace EtherCAT_Studio
                         string type = stepData.TryGetProperty("type", out var typeEl) 
                             ? typeEl.GetString() ?? "ABS MOVE" 
                             : "ABS MOVE";
-                        
-                        // 호환성: 기존 "MOTION" 타입을 "ABS MOVE"로 변환
-                        if (type == "MOTION")
-                            type = "ABS MOVE";
                         
                         string? stepId = stepData.TryGetProperty("id", out var idEl)
                             ? idEl.GetString()
