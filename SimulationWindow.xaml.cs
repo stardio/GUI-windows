@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
@@ -28,12 +29,14 @@ namespace EtherCAT_Studio
         private int _segmentIndex;
         private double _segmentT;
         private readonly Model3DGroup _scene;
+        private readonly ScaleTransform3D _sceneScale;
         private readonly GeometryModel3D _pathModel;
         private readonly GeometryModel3D _trailModel;
         private readonly Model3DGroup _keyPointGroup;
         private readonly GeometryModel3D _cursorModel;
         private readonly TranslateTransform3D _cursorTransform;
         private readonly List<Point3D> _trailPoints = new();
+        private readonly List<Viewport2DVisual3D> _labelVisuals = new();
         private PerspectiveCamera _camera;
         private double _yaw = 45;
         private double _pitch = 35;
@@ -53,8 +56,17 @@ namespace EtherCAT_Studio
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
             _timer.Tick += Timer_Tick;
             SpeedSlider.ValueChanged += (s, e) => SpeedText.Text = $"{SpeedSlider.Value:0.0}x";
+            ViewScaleSlider.ValueChanged += (s, e) =>
+            {
+                _sceneScale.ScaleX = ViewScaleSlider.Value;
+                _sceneScale.ScaleY = ViewScaleSlider.Value;
+                _sceneScale.ScaleZ = ViewScaleSlider.Value;
+                ViewScaleText.Text = $"{ViewScaleSlider.Value:0.00}";
+            };
 
             _scene = new Model3DGroup();
+            _sceneScale = new ScaleTransform3D(1, 1, 1);
+            _scene.Transform = _sceneScale;
             _scene.Children.Add(new AmbientLight(Color.FromRgb(80, 80, 80)));
             _scene.Children.Add(new DirectionalLight(Color.FromRgb(200, 200, 200), new Vector3D(-1, 1, -1)));
 
@@ -96,6 +108,8 @@ namespace EtherCAT_Studio
 
             var modelVisual = new ModelVisual3D { Content = _scene };
             Viewport.Children.Add(modelVisual);
+
+            AddAxisLabels(2000, 200);
         }
 
         public void SetSimulationData(IReadOnlyList<Point3D> points, IReadOnlyList<int> pointStepIndex, IReadOnlyList<SimulationStep> steps)
@@ -331,8 +345,90 @@ namespace EtherCAT_Studio
             UpdateCamera();
         }
 
+        private void AddAxisLabels(double size, double step)
+        {
+            ClearAxisLabels();
+
+            double half = size / 2.0;
+            double offset = 12;
+
+            for (double x = -half; x <= half; x += step)
+            {
+                var pos = new Point3D(x, -offset, 0);
+                AddLabelVisual(pos, new Vector3D(1, 0, 0), new Vector3D(0, 1, 0), 40, 16, x.ToString("0"));
+            }
+
+            for (double y = -half; y <= half; y += step)
+            {
+                var pos = new Point3D(offset, y, 0);
+                AddLabelVisual(pos, new Vector3D(1, 0, 0), new Vector3D(0, 1, 0), 40, 16, y.ToString("0"));
+            }
+        }
+
+        private void ClearAxisLabels()
+        {
+            foreach (var visual in _labelVisuals)
+            {
+                Viewport.Children.Remove(visual);
+            }
+            _labelVisuals.Clear();
+        }
+
+        private void AddLabelVisual(Point3D origin, Vector3D right, Vector3D up, double width, double height, string text)
+        {
+            var p0 = origin;
+            var p1 = origin + right * width;
+            var p2 = origin + right * width + up * height;
+            var p3 = origin + up * height;
+
+            var mesh = new MeshGeometry3D
+            {
+                Positions = new Point3DCollection { p0, p1, p2, p3 },
+                TextureCoordinates = new PointCollection
+                {
+                    new Point(0, 1),
+                    new Point(1, 1),
+                    new Point(1, 0),
+                    new Point(0, 0)
+                },
+                TriangleIndices = new Int32Collection { 0, 1, 2, 0, 2, 3 }
+            };
+
+            var labelText = new TextBlock
+            {
+                Text = text,
+                Foreground = Brushes.White,
+                Background = new SolidColorBrush(Color.FromArgb(140, 20, 20, 20)),
+                FontSize = 10,
+                Padding = new Thickness(2, 0, 2, 0)
+            };
+
+            var material = new DiffuseMaterial(Brushes.White);
+            material.SetValue(Viewport2DVisual3D.IsVisualHostMaterialProperty, true);
+
+            var visual = new Viewport2DVisual3D
+            {
+                Geometry = mesh,
+                Material = material,
+                Visual = labelText,
+                Transform = _sceneScale
+            };
+
+            _labelVisuals.Add(visual);
+            Viewport.Children.Add(visual);
+        }
+
         private void Viewport_MouseWheel(object sender, MouseWheelEventArgs e)
         {
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                double step = 0.05;
+                if (e.Delta > 0) ViewScaleSlider.Value = Math.Min(ViewScaleSlider.Maximum, ViewScaleSlider.Value + step);
+                else ViewScaleSlider.Value = Math.Max(ViewScaleSlider.Minimum, ViewScaleSlider.Value - step);
+                e.Handled = true;
+                return;
+            }
+
             if (e.Delta > 0) _distance *= 0.9;
             else _distance *= 1.1;
             _distance = Math.Max(100, Math.Min(5000, _distance));

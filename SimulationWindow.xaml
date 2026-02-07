@@ -18,6 +18,9 @@
                 <TextBlock Text="Speed" Foreground="White" VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <Slider x:Name="SpeedSlider" Width="180" Minimum="0.2" Maximum="5" Value="1" SmallChange="0.1" LargeChange="0.5"/>
                 <TextBlock x:Name="SpeedText" Text="1.0x" Foreground="White" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                <TextBlock Text="View Scale" Foreground="White" VerticalAlignment="Center" Margin="16,0,6,0"/>
+                <Slider x:Name="ViewScaleSlider" Width="160" Minimum="0.5" Maximum="2.0" Value="1" SmallChange="0.05" LargeChange="0.1"/>
+                <TextBlock x:Name="ViewScaleText" Text="1.00" Foreground="White" VerticalAlignment="Center" Margin="8,0,0,0"/>
             </StackPanel>
         </Border>
 
@@ -33,6 +36,9 @@
                             MouseLeftButtonDown="Viewport_MouseLeftButtonDown"
                             MouseLeftButtonUp="Viewport_MouseLeftButtonUp"
                             MouseMove="Viewport_MouseMove">
+                    <Viewport3D.LayoutTransform>
+                        <ScaleTransform x:Name="ViewportScale" ScaleX="1" ScaleY="1" />
+                    </Viewport3D.LayoutTransform>
                     <Viewport3D.Camera>
                         <PerspectiveCamera x:Name="MainCamera" Position="500,-800,600" LookDirection="-500,800,-600" UpDirection="0,0,1" FieldOfView="45" />
                     </Viewport3D.Camera>

@@ -4,10 +4,104 @@
              xmlns:local="clr-namespace:EtherCAT_Studio"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
+        <!-- Dark theme palette -->
+        <SolidColorBrush x:Key="DarkBackground" Color="#1E1E1E" />
+        <SolidColorBrush x:Key="DarkSurface" Color="#232323" />
+        <SolidColorBrush x:Key="DarkSurfaceAlt" Color="#2B2B2B" />
+        <SolidColorBrush x:Key="DarkBorder" Color="#3A3A3A" />
+        <SolidColorBrush x:Key="DarkText" Color="#F2F2F2" />
+        <SolidColorBrush x:Key="DarkTextMuted" Color="#C8C8C8" />
+        <SolidColorBrush x:Key="DarkAccent" Color="#3B82F6" />
+
         <!-- Dark mode system brush overrides -->
-        <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#000000" />
-        <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#000000" />
-        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#111111" />
-        <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="White" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#1E1E1E" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#232323" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightBrushKey}" Color="#2B2B2B" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.ControlDarkBrushKey}" Color="#1A1A1A" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#2F65D8" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#F2F2F2" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#F2F2F2" />
+
+        <!-- Global styles -->
+        <Style TargetType="Window">
+            <Setter Property="Background" Value="{StaticResource DarkBackground}" />
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+        </Style>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+        </Style>
+
+        <Style TargetType="Label">
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource DarkSurface}" />
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+            <Setter Property="CaretBrush" Value="{StaticResource DarkText}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DarkBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,4" />
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource DarkSurface}" />
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DarkBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="4" />
+        </Style>
+
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="{StaticResource DarkSurface}" />
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+        </Style>
+
+        <Style TargetType="ListBox">
+            <Setter Property="Background" Value="{StaticResource DarkSurface}" />
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DarkBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+        </Style>
+
+        <Style TargetType="Menu">
+            <Setter Property="Background" Value="{StaticResource DarkSurface}" />
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+        </Style>
+
+        <Style TargetType="MenuItem">
+            <Setter Property="Background" Value="{StaticResource DarkSurface}" />
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+        </Style>
+
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource DarkSurfaceAlt}" />
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DarkBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,4" />
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+        </Style>
+
+        <Style TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+        </Style>
+
+        <Style TargetType="GroupBox">
+            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DarkBorder}" />
+        </Style>
+
+        <Style TargetType="Separator">
+            <Setter Property="Background" Value="{StaticResource DarkBorder}" />
+        </Style>
     </Application.Resources>
 </Application>
