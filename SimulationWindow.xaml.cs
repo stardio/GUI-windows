@@ -24,6 +24,7 @@ namespace EtherCAT_Studio
         private List<int> _pointStepIndex = new();
         private List<SimulationStep> _steps = new();
         private int _currentStepIndex = -1;
+        private double _currentSpeedFactor = 1.0;
         private int _segmentIndex;
         private double _segmentT;
         private readonly Model3DGroup _scene;
@@ -105,8 +106,8 @@ namespace EtherCAT_Studio
             StepList.ItemsSource = _steps.Select(s => s.Label).ToList();
             ResetTrail();
 
-            // Path mesh (do not pre-render full path; trail will render during movement)
-            _pathModel.Geometry = new MeshGeometry3D();
+            // Path mesh (full path for visibility)
+            _pathModel.Geometry = CreatePathMesh(_points, 1.2);
 
             // Key points as small spheres
             _keyPointGroup.Children.Clear();
@@ -136,6 +137,8 @@ namespace EtherCAT_Studio
                 UpdateCoordText(_points[0]);
             }
 
+            AutoCenterCamera();
+
             UpdateCurrentStepByPointIndex(0);
         }
 
@@ -151,7 +154,7 @@ namespace EtherCAT_Studio
             var p0 = _points[_segmentIndex];
             var p1 = _points[_segmentIndex + 1];
 
-            _segmentT += SpeedSlider.Value * 0.03;
+            _segmentT += SpeedSlider.Value * 0.03 * _currentSpeedFactor;
             if (_segmentT >= 1.0)
             {
                 _segmentIndex++;
@@ -227,6 +230,39 @@ namespace EtherCAT_Studio
             var step = _steps[stepIndex];
             CurrentStepText.Text = step.Label;
             StepJsonText.Text = TryFormatJson(step.Json);
+            _currentSpeedFactor = GetSpeedFactor(step.Json);
+        }
+
+        private static double GetSpeedFactor(string json)
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(string.IsNullOrWhiteSpace(json) ? "{}" : json);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("speed", out var speedEl)) return 1.0;
+
+                double speed = 0;
+                if (speedEl.ValueKind == System.Text.Json.JsonValueKind.Object && speedEl.TryGetProperty("value", out var v))
+                {
+                    if (v.ValueKind == System.Text.Json.JsonValueKind.Number) speed = v.GetDouble();
+                    else if (v.ValueKind == System.Text.Json.JsonValueKind.String && double.TryParse(v.GetString(), out var ds)) speed = ds;
+                }
+                else if (speedEl.ValueKind == System.Text.Json.JsonValueKind.Number)
+                {
+                    speed = speedEl.GetDouble();
+                }
+                else if (speedEl.ValueKind == System.Text.Json.JsonValueKind.String && double.TryParse(speedEl.GetString(), out var ds))
+                {
+                    speed = ds;
+                }
+
+                if (speed <= 0) return 1.0;
+                return Math.Max(0.1, Math.Min(5.0, speed / 1000.0));
+            }
+            catch
+            {
+                return 1.0;
+            }
         }
 
         private static string TryFormatJson(string json)
@@ -260,10 +296,39 @@ namespace EtherCAT_Studio
             }
 
             var last = _trailPoints[_trailPoints.Count - 1];
-            if ((point - last).Length < 1.0) return;
+            if ((point - last).Length < 0.1) return;
 
             _trailPoints.Add(point);
             _trailModel.Geometry = CreatePathMesh(_trailPoints, 1.6);
+        }
+
+        private void AutoCenterCamera()
+        {
+            if (_points.Count == 0) return;
+
+            double minX = _points[0].X, maxX = _points[0].X;
+            double minY = _points[0].Y, maxY = _points[0].Y;
+            double minZ = _points[0].Z, maxZ = _points[0].Z;
+
+            for (int i = 1; i < _points.Count; i++)
+            {
+                var p = _points[i];
+                if (p.X < minX) minX = p.X;
+                if (p.X > maxX) maxX = p.X;
+                if (p.Y < minY) minY = p.Y;
+                if (p.Y > maxY) maxY = p.Y;
+                if (p.Z < minZ) minZ = p.Z;
+                if (p.Z > maxZ) maxZ = p.Z;
+            }
+
+            _target = new Point3D((minX + maxX) / 2.0, (minY + maxY) / 2.0, (minZ + maxZ) / 2.0);
+            double dx = maxX - minX;
+            double dy = maxY - minY;
+            double dz = maxZ - minZ;
+            double span = Math.Max(dx, Math.Max(dy, dz));
+            if (span < 1) span = 1;
+            _distance = Math.Max(200, Math.Min(5000, span * 2.0));
+            UpdateCamera();
         }
 
         private void Viewport_MouseWheel(object sender, MouseWheelEventArgs e)

@@ -138,6 +138,7 @@ params 구조:
 - REL MOVE: {""axis"":""Y"", ""distance"":500, ""speed"":300}
 - WAIT: {""delay"":2000}
 - LINEAR_MOVE: {""target"":{""X"":100,""Y"":200,""Z"":0}, ""speed"":300}
+- CIRCULAR_MOVE: {""pass"":{""X"":100,""Y"":200}, ""end"":{""X"":300,""Y"":400}, ""direction"":""CW"", ""speed"":300, ""plane"":""XY""}
 - COUNTER: {""name"":""cnt1"", ""initial"":0, ""target"":10, ""increment"":1, ""gotoNode"":""node_02""}
 - GOTO: {""targetNode"":""node_05""}
 - START/END: {}
@@ -310,9 +311,10 @@ JSON만 출력하세요. 설명은 금지.
                     "target" => "target",
                     
                     // CIRCULAR_MOVE 관련
-                    "center" => "center",
-                    "end" or "endpoint" => "end",
+                    "pass" => "pass",
+                    "end" => "end",
                     "direction" => "direction",
+                    "plane" => "plane",
                     
                     // COUNTER 관련
                     "name" => "name",

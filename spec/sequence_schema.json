@@ -97,9 +97,18 @@
     },
     "circularMoveParams": {
       "type": "object",
-      "required": ["center", "end", "direction"],
+      "required": ["center", "pass", "end", "direction", "speed", "plane"],
       "properties": {
         "center": {
+          "type": "object",
+          "required": ["X", "Y"],
+          "properties": {
+            "X": { "type": "number" },
+            "Y": { "type": "number" }
+          },
+          "additionalProperties": false
+        },
+        "pass": {
           "type": "object",
           "required": ["X", "Y"],
           "properties": {
@@ -117,7 +126,9 @@
           },
           "additionalProperties": false
         },
-        "direction": { "type": "string", "enum": ["CW", "CCW"] }
+        "direction": { "type": "string", "enum": ["CW", "CCW"] },
+        "speed": { "type": "number" },
+        "plane": { "type": "string", "enum": ["XY", "XZ", "YZ"] }
       },
       "additionalProperties": true
     },

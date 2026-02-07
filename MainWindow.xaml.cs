@@ -747,14 +747,14 @@ namespace EtherCAT_Studio
                             }
                             else if (type == "CIRCULAR_MOVE")
                             {
-                                var center = new { X = 0.0, Y = 0.0 };
+                                var pass = new { X = 0.0, Y = 0.0 };
                                 var end = new { X = 0.0, Y = 0.0 };
                                 
-                                if (root.TryGetProperty("center", out var c))
+                                if (root.TryGetProperty("pass", out var passProp))
                                 {
-                                    double cx = GetPropDouble(c, "X", 0);
-                                    double cy = GetPropDouble(c, "Y", 0);
-                                    center = new { X = cx, Y = cy };
+                                    double px = GetPropDouble(passProp, "X", 0);
+                                    double py = GetPropDouble(passProp, "Y", 0);
+                                    pass = new { X = px, Y = py };
                                 }
                                 
                                 if (root.TryGetProperty("end", out var endProp))
@@ -765,7 +765,9 @@ namespace EtherCAT_Studio
                                 }
                                 
                                 string direction = GetPropString(root, "direction", "CW");
-                                paramsObj = new { center, end, direction };
+                                double speed = GetPropDouble(root, "speed", 0);
+                                string plane = GetPropString(root, "plane", "XY");
+                                paramsObj = new { pass, end, direction, speed, plane };
                             }
                             else if (type == "COUNTER")
                             {
@@ -1092,17 +1094,19 @@ namespace EtherCAT_Studio
                         }
                         else if (originalType == "CIRCULAR_MOVE")
                         {
-                            var center = new { X = 0.0, Y = 0.0 };
+                            var pass = new { X = 0.0, Y = 0.0 };
                             var end = new { X = 0.0, Y = 0.0 };
                             string direction = "";
+                            double speed = 0;
+                            string plane = "XY";
                             
-                            if (root.TryGetProperty("center", out var c))
+                            if (root.TryGetProperty("pass", out var passProp))
                             {
-                                double cx = GetPropDouble(c, "X", 0);
-                                double cy = GetPropDouble(c, "Y", 0);
-                                center = new { X = cx, Y = cy };
+                                double px = GetPropDouble(passProp, "X", 0);
+                                double py = GetPropDouble(passProp, "Y", 0);
+                                pass = new { X = px, Y = py };
                             }
-                            
+
                             if (root.TryGetProperty("end", out var endProp))
                             {
                                 double ex = GetPropDouble(endProp, "X", 0);
@@ -1111,13 +1115,17 @@ namespace EtherCAT_Studio
                             }
                             
                             direction = GetPropString(root, "direction", "CW");
+                            speed = GetPropDouble(root, "speed", 0);
+                            plane = GetPropString(root, "plane", "XY");
                             
-                            paramPairs.Add(("center.X", center.X));
-                            paramPairs.Add(("center.Y", center.Y));
+                            paramPairs.Add(("pass.X", pass.X));
+                            paramPairs.Add(("pass.Y", pass.Y));
                             paramPairs.Add(("end.X", end.X));
                             paramPairs.Add(("end.Y", end.Y));
                             paramPairs.Add(("direction", direction));
-                            paramsObj = new { center, end, direction };
+                            paramPairs.Add(("speed", speed));
+                            paramPairs.Add(("plane", plane));
+                            paramsObj = new { pass, end, direction, speed, plane };
                         }
                         else if (originalType == "COUNTER")
                         {
@@ -1397,17 +1405,247 @@ namespace EtherCAT_Studio
                     }
                     else if (type == "CIRCULAR_MOVE")
                     {
-                        if (root.TryGetProperty("center", out var c) && root.TryGetProperty("end", out var end))
+                        string dir = GetPropString(root, "direction", "CW").ToUpperInvariant();
+                        string plane = GetPropString(root, "plane", "XY").ToUpperInvariant();
+
+                        bool hasPass = false;
+                        bool hasEnd = false;
+                        double passU = 0, passV = 0;
+                        double endU = 0, endV = 0;
+
+                        if (root.TryGetProperty("pass", out var pass))
+                        {
+                            if (plane == "XZ")
+                            {
+                                passU = GetPropNumber(pass, "X");
+                                passV = GetPropNumber(pass, "Z", "Y");
+                            }
+                            else if (plane == "YZ")
+                            {
+                                passU = GetPropNumber(pass, "Y", "X");
+                                passV = GetPropNumber(pass, "Z", "Y");
+                            }
+                            else
+                            {
+                                passU = GetPropNumber(pass, "X");
+                                passV = GetPropNumber(pass, "Y");
+                            }
+                            hasPass = true;
+                        }
+
+                        if (root.TryGetProperty("end", out var end))
+                        {
+                            if (plane == "XZ")
+                            {
+                                endU = GetPropNumber(end, "X");
+                                endV = GetPropNumber(end, "Z", "Y");
+                            }
+                            else if (plane == "YZ")
+                            {
+                                endU = GetPropNumber(end, "Y", "X");
+                                endV = GetPropNumber(end, "Z", "Y");
+                            }
+                            else
+                            {
+                                endU = GetPropNumber(end, "X");
+                                endV = GetPropNumber(end, "Y");
+                            }
+                            hasEnd = true;
+                        }
+
+                        if (hasPass && hasEnd)
+                        {
+                            double startU, startV;
+                            if (plane == "XZ")
+                            {
+                                startU = x; startV = z;
+                            }
+                            else if (plane == "YZ")
+                            {
+                                startU = y; startV = z;
+                            }
+                            else
+                            {
+                                startU = x; startV = y;
+                            }
+
+                            if (!TryComputeCircleCenter2D(startU, startV, passU, passV, endU, endV, out var centerU, out var centerV))
+                            {
+                                if (plane == "XZ")
+                                {
+                                    x = endU; z = endV;
+                                }
+                                else if (plane == "YZ")
+                                {
+                                    y = endU; z = endV;
+                                }
+                                else
+                                {
+                                    x = endU; y = endV;
+                                }
+                                data.Points.Add(new Point3D(x, y, z));
+                                data.PointStepIndex.Add(i);
+                                continue;
+                            }
+
+                            double startAngle = Math.Atan2(startV - centerV, startU - centerU);
+                            double passAngle = Math.Atan2(passV - centerV, passU - centerU);
+                            double endAngle = Math.Atan2(endV - centerV, endU - centerU);
+
+                            double twoPi = Math.PI * 2;
+                            double NormalizeAngle(double a)
+                            {
+                                a %= twoPi;
+                                if (a < 0) a += twoPi;
+                                return a;
+                            }
+
+                            if (dir == "CW")
+                            {
+                                double s = NormalizeAngle(startAngle);
+                                double p = NormalizeAngle(passAngle);
+                                double e = NormalizeAngle(endAngle);
+
+                                if (e > s) e -= twoPi;
+                                if (p > s) p -= twoPi;
+                                if (p < e) e -= twoPi;
+
+                                startAngle = s;
+                                endAngle = e;
+                            }
+                            else
+                            {
+                                double s = NormalizeAngle(startAngle);
+                                double p = NormalizeAngle(passAngle);
+                                double e = NormalizeAngle(endAngle);
+
+                                if (e < s) e += twoPi;
+                                if (p < s) p += twoPi;
+                                if (p > e) e += twoPi;
+
+                                startAngle = s;
+                                endAngle = e;
+                            }
+
+                            double radius = Math.Sqrt(Math.Pow(startU - centerU, 2) + Math.Pow(startV - centerV, 2));
+                            if (radius > 0.0001)
+                            {
+                                int steps = 30;
+                                for (int j = 1; j <= steps; j++)
+                                {
+                                    double t = j / (double)steps;
+                                    double a = startAngle + (endAngle - startAngle) * t;
+                                    double u = centerU + radius * Math.Cos(a);
+                                    double v = centerV + radius * Math.Sin(a);
+
+                                    if (plane == "XZ")
+                                    {
+                                        data.Points.Add(new Point3D(u, y, v));
+                                    }
+                                    else if (plane == "YZ")
+                                    {
+                                        data.Points.Add(new Point3D(x, u, v));
+                                    }
+                                    else
+                                    {
+                                        data.Points.Add(new Point3D(u, v, z));
+                                    }
+                                    data.PointStepIndex.Add(i);
+                                }
+                            }
+
+                            if (plane == "XZ")
+                            {
+                                x = endU; z = endV;
+                            }
+                            else if (plane == "YZ")
+                            {
+                                y = endU; z = endV;
+                            }
+                            else
+                            {
+                                x = endU; y = endV;
+                            }
+                        }
+                        else if (root.TryGetProperty("center", out var c))
                         {
                             double cx = GetPropNumber(c, "X");
                             double cy = GetPropNumber(c, "Y");
-                            double ex = GetPropNumber(end, "X");
-                            double ey = GetPropNumber(end, "Y");
+                            double cz = GetPropNumber(c, "Z");
 
-                            string dir = GetPropString(root, "direction", "CW").ToUpperInvariant();
-                            double startAngle = Math.Atan2(y - cy, x - cx);
-                            double endAngle = Math.Atan2(ey - cy, ex - cx);
-                            double radius = Math.Sqrt(Math.Pow(x - cx, 2) + Math.Pow(y - cy, 2));
+                            double angleDeg = GetPropNumber(root, "angle", "angle_deg");
+                            double radiusParam = GetPropNumber(root, "radius");
+
+                            double startU, startV, centerU, centerV;
+                            double? legacyEndU = null, legacyEndV = null;
+                            if (plane == "XZ")
+                            {
+                                startU = x; startV = z;
+                                centerU = cx; centerV = cz;
+                            }
+                            else if (plane == "YZ")
+                            {
+                                startU = y; startV = z;
+                                centerU = cy; centerV = cz;
+                            }
+                            else
+                            {
+                                startU = x; startV = y;
+                                centerU = cx; centerV = cy;
+                            }
+
+                            if (root.TryGetProperty("end", out var legacyEnd))
+                            {
+                                if (plane == "XZ")
+                                {
+                                    legacyEndU = GetPropNumber(legacyEnd, "X");
+                                    legacyEndV = GetPropNumber(legacyEnd, "Z");
+                                }
+                                else if (plane == "YZ")
+                                {
+                                    legacyEndU = GetPropNumber(legacyEnd, "Y");
+                                    legacyEndV = GetPropNumber(legacyEnd, "Z");
+                                }
+                                else
+                                {
+                                    legacyEndU = GetPropNumber(legacyEnd, "X");
+                                    legacyEndV = GetPropNumber(legacyEnd, "Y");
+                                }
+                            }
+
+                            double startAngle = Math.Atan2(startV - centerV, startU - centerU);
+                            double radius = Math.Sqrt(Math.Pow(startU - centerU, 2) + Math.Pow(startV - centerV, 2));
+
+                            if (radius <= 0.0001)
+                            {
+                                if (radiusParam > 0)
+                                {
+                                    radius = radiusParam;
+                                }
+                                else if (legacyEndU.HasValue && legacyEndV.HasValue)
+                                {
+                                    radius = Math.Sqrt(Math.Pow(legacyEndU.Value - centerU, 2) + Math.Pow(legacyEndV.Value - centerV, 2));
+                                }
+                                else
+                                {
+                                    continue;
+                                }
+                            }
+
+                            double endAngle;
+                            if (Math.Abs(angleDeg) > 0.0001)
+                            {
+                                double angleRad = angleDeg * Math.PI / 180.0;
+                                endAngle = dir == "CW" ? startAngle - Math.Abs(angleRad) : startAngle + Math.Abs(angleRad);
+                            }
+                            else if (legacyEndU.HasValue && legacyEndV.HasValue)
+                            {
+                                endAngle = Math.Atan2(legacyEndV.Value - centerV, legacyEndU.Value - centerU);
+                            }
+                            else
+                            {
+                                continue;
+                            }
 
                             if (radius > 0.0001)
                             {
@@ -1425,15 +1663,40 @@ namespace EtherCAT_Studio
                                 {
                                     double t = j / (double)steps;
                                     double a = startAngle + (endAngle - startAngle) * t;
-                                    double px = cx + radius * Math.Cos(a);
-                                    double py = cy + radius * Math.Sin(a);
-                                    data.Points.Add(new Point3D(px, py, z));
+                                    double u = centerU + radius * Math.Cos(a);
+                                    double v = centerV + radius * Math.Sin(a);
+
+                                    if (plane == "XZ")
+                                    {
+                                        data.Points.Add(new Point3D(u, y, v));
+                                    }
+                                    else if (plane == "YZ")
+                                    {
+                                        data.Points.Add(new Point3D(x, u, v));
+                                    }
+                                    else
+                                    {
+                                        data.Points.Add(new Point3D(u, v, z));
+                                    }
                                     data.PointStepIndex.Add(i);
                                 }
                             }
 
-                            x = ex;
-                            y = ey;
+                            if (plane == "XZ")
+                            {
+                                x = centerU + radius * Math.Cos(endAngle);
+                                z = centerV + radius * Math.Sin(endAngle);
+                            }
+                            else if (plane == "YZ")
+                            {
+                                y = centerU + radius * Math.Cos(endAngle);
+                                z = centerV + radius * Math.Sin(endAngle);
+                            }
+                            else
+                            {
+                                x = centerU + radius * Math.Cos(endAngle);
+                                y = centerV + radius * Math.Sin(endAngle);
+                            }
                         }
                     }
                 }
@@ -1444,6 +1707,30 @@ namespace EtherCAT_Studio
             }
 
             return data;
+        }
+
+        private static bool TryComputeCircleCenter2D(
+            double x1, double y1,
+            double x2, double y2,
+            double x3, double y3,
+            out double cx, out double cy)
+        {
+            double d = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+            if (Math.Abs(d) < 1e-8)
+            {
+                cx = 0;
+                cy = 0;
+                return false;
+            }
+
+            double x1sq = x1 * x1 + y1 * y1;
+            double x2sq = x2 * x2 + y2 * y2;
+            double x3sq = x3 * x3 + y3 * y3;
+
+            cx = (x1sq * (y2 - y3) + x2sq * (y3 - y1) + x3sq * (y1 - y2)) / d;
+            cy = (x1sq * (x3 - x2) + x2sq * (x1 - x3) + x3sq * (x2 - x1)) / d;
+
+            return true;
         }
 
         // =============== AI SEQUENCE GENERATION ===============
