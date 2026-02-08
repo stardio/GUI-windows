@@ -33,13 +33,15 @@
         <TextBox x:Name="SpeedBox" Grid.Row="4" Grid.Column="1" Margin="0,0,0,4" Background="#000" Foreground="White"/>
 
         <TextBlock Text="Direction" Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,0,4"/>
-        <ComboBox x:Name="DirectionBox" Grid.Row="5" Grid.Column="1" Margin="0,0,0,4" Background="#000" Foreground="White">
+        <ComboBox x:Name="DirectionBox" Grid.Row="5" Grid.Column="1" Margin="0,0,0,4" Background="#000" Foreground="White"
+                  ItemContainerStyle="{DynamicResource DarkComboBoxItemStyle}">
             <ComboBoxItem Content="CW"/>
             <ComboBoxItem Content="CCW"/>
         </ComboBox>
 
         <TextBlock Text="Plane" Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,0,4"/>
-        <ComboBox x:Name="PlaneBox" Grid.Row="6" Grid.Column="1" Margin="0,0,0,4" Background="#000" Foreground="White">
+        <ComboBox x:Name="PlaneBox" Grid.Row="6" Grid.Column="1" Margin="0,0,0,4" Background="#000" Foreground="White"
+                  ItemContainerStyle="{DynamicResource DarkComboBoxItemStyle}">
             <ComboBoxItem Content="XY"/>
             <ComboBoxItem Content="XZ"/>
             <ComboBoxItem Content="YZ"/>

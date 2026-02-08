@@ -23,6 +23,7 @@
             "WAIT",
             "IO",
             "FLOW",
+            "LABEL",
             "START",
             "END",
             "LINEAR_MOVE",

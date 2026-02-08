@@ -14,6 +14,7 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="PlayButton" Content="Play" Width="80" Height="32" Margin="0,0,8,0" Click="Play_Click"/>
                 <Button x:Name="PauseButton" Content="Pause" Width="80" Height="32" Margin="0,0,8,0" Click="Pause_Click"/>
+                <Button x:Name="StopButton" Content="Stop" Width="80" Height="32" Margin="0,0,8,0" Click="Stop_Click"/>
                 <Button x:Name="ResetButton" Content="Reset" Width="80" Height="32" Margin="0,0,16,0" Click="Reset_Click"/>
                 <TextBlock Text="Speed" Foreground="White" VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <Slider x:Name="SpeedSlider" Width="180" Minimum="0.2" Maximum="5" Value="1" SmallChange="0.1" LargeChange="0.5"/>

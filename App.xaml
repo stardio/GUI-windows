@@ -13,6 +13,11 @@
         <SolidColorBrush x:Key="DarkTextMuted" Color="#C8C8C8" />
         <SolidColorBrush x:Key="DarkAccent" Color="#3B82F6" />
 
+        <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#000000" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
         <!-- Dark mode system brush overrides -->
         <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#1E1E1E" />
         <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#232323" />
@@ -51,11 +56,19 @@
             <Setter Property="BorderBrush" Value="{StaticResource DarkBorder}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="4" />
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Background" Value="#000000" />
+                        <Setter Property="Foreground" Value="White" />
+                    </Style>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="{StaticResource DarkSurface}" />
-            <Setter Property="Foreground" Value="{StaticResource DarkText}" />
+            <Setter Property="Background" Value="#000000" />
+            <Setter Property="Foreground" Value="White" />
         </Style>
 
         <Style TargetType="ListBox">

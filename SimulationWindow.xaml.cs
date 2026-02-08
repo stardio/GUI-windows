@@ -128,7 +128,7 @@ namespace EtherCAT_Studio
             AddAxisXYZLabels();
         }
 
-        public void SetSimulationData(IReadOnlyList<Point3D> points, IReadOnlyList<int> pointStepIndex, IReadOnlyList<SimulationStep> steps)
+        public void SetSimulationData(IReadOnlyList<Point3D> points, IReadOnlyList<int> pointStepIndex, IReadOnlyList<SimulationStep> steps, IReadOnlyList<Point3D> keyPoints)
         {
             _points = points?.ToList() ?? new List<Point3D>();
             _pointStepIndex = pointStepIndex?.ToList() ?? new List<int>();
@@ -137,24 +137,22 @@ namespace EtherCAT_Studio
             ParamGrid.ItemsSource = _editParams;
             ResetTrail();
 
-            // Path mesh (full path for visibility)
-            _pathModel.Geometry = CreatePathMesh(_points, 1.2);
+            // Path mesh (do not pre-render; show trail only while moving)
+            _pathModel.Geometry = new MeshGeometry3D();
 
             // Key points as small spheres
             _keyPointGroup.Children.Clear();
-            for (int i = 0; i < _points.Count; i++)
+            var keys = keyPoints?.ToList() ?? new List<Point3D>();
+            for (int i = 0; i < keys.Count; i++)
             {
-                if (i == 0 || i == _points.Count - 1 || i % 5 == 0)
+                var mesh = CreateSphereMesh(keys[i], 4, 8, 6);
+                var model = new GeometryModel3D
                 {
-                    var mesh = CreateSphereMesh(_points[i], 4, 8, 6);
-                    var model = new GeometryModel3D
-                    {
-                        Geometry = mesh,
-                        Material = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(255, 200, 80))),
-                        BackMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(255, 200, 80)))
-                    };
-                    _keyPointGroup.Children.Add(model);
-                }
+                    Geometry = mesh,
+                    Material = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(255, 200, 80))),
+                    BackMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(255, 200, 80)))
+                };
+                _keyPointGroup.Children.Add(model);
             }
 
             _segmentIndex = 0;
@@ -222,6 +220,11 @@ namespace EtherCAT_Studio
         }
 
         private void Pause_Click(object sender, RoutedEventArgs e)
+        {
+            _timer.Stop();
+        }
+
+        private void Stop_Click(object sender, RoutedEventArgs e)
         {
             _timer.Stop();
         }

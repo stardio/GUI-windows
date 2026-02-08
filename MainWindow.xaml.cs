@@ -188,6 +188,11 @@ namespace EtherCAT_Studio
             AddNode("GOTO", Brushes.IndianRed, nodeType: "GOTO");
         }
 
+        private void AddLabelNode_Click(object sender, RoutedEventArgs e)
+        {
+            AddNode("LABEL", new SolidColorBrush(Color.FromRgb(20, 184, 166)), nodeType: "LABEL");
+        }
+
         private void AddJump_Click(object sender, RoutedEventArgs e)
         {
             AddNode("JUMP", Brushes.MediumPurple, nodeType: "JUMP");
@@ -203,6 +208,54 @@ namespace EtherCAT_Studio
         {
             // END node: only input port on left
             AddNode("END", Brushes.Red, 16, 140, 48, hasInput: true, hasOutput: false, nodeType: "END");
+        }
+
+        private void NodeTemplateCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (NodeTemplateCombo.SelectedItem is not ComboBoxItem item) return;
+            string choice = item.Content?.ToString() ?? string.Empty;
+
+            switch (choice)
+            {
+                case "ABS MOVE":
+                    AddAbsMoveNode_Click(sender, e);
+                    break;
+                case "REL MOVE":
+                    AddRelMoveNode_Click(sender, e);
+                    break;
+                case "LINEAR MOVE":
+                    AddLinearMoveNode_Click(sender, e);
+                    break;
+                case "CIRCULAR MOVE":
+                    AddCircularMoveNode_Click(sender, e);
+                    break;
+                case "WAIT":
+                    AddWaitNode_Click(sender, e);
+                    break;
+                case "COUNTER":
+                    AddCounterNode_Click(sender, e);
+                    break;
+                case "SET DO":
+                    AddSetDo_Click(sender, e);
+                    break;
+                case "CHECK DI":
+                    AddCheckDi_Click(sender, e);
+                    break;
+                case "GOTO":
+                    AddGoto_Click(sender, e);
+                    break;
+                case "LABEL":
+                    AddLabelNode_Click(sender, e);
+                    break;
+                case "START":
+                    AddStartNode_Click(sender, e);
+                    break;
+                case "END":
+                    AddEndNode_Click(sender, e);
+                    break;
+            }
+
+            NodeTemplateCombo.SelectedIndex = -1;
         }
 
         private void AddLinearMoveNode_Click(object sender, RoutedEventArgs e)
@@ -450,6 +503,7 @@ namespace EtherCAT_Studio
                     "CHECK_DI" => Brushes.Gold,
                     "GOTO" => Brushes.IndianRed,
                     "JUMP" => Brushes.MediumPurple,
+                    "LABEL" => new SolidColorBrush(Color.FromRgb(0x14, 0xB8, 0xA6)),
                     "START" => Brushes.LimeGreen,
                     "END" => Brushes.Red,
                     "LINEAR_MOVE" => Brushes.Blue,
@@ -464,7 +518,7 @@ namespace EtherCAT_Studio
 
                 var node = new NodeControl(originalLabel, color, this, 16, 140, 48, hasInput, hasOutput, nodeType);
                 node.SetNodeNumber(loadedNodes.Count + 1);
-                node.JsonData = jsonData;
+                node.ApplyJsonData(jsonData);
                 Canvas.SetLeft(node, x);
                 Canvas.SetTop(node, y);
                 MainCanvas.Children.Add(node);
@@ -680,6 +734,7 @@ namespace EtherCAT_Studio
                     "FLOW" => "FLOW",
                     "GOTO" => "FLOW",
                     "JUMP" => "GOTO",
+                    "LABEL" => "LABEL",
                     "START" => "START",
                     "END" => "END",
                     "LINEAR MOVE" => "LINEAR_MOVE",
@@ -1311,7 +1366,7 @@ namespace EtherCAT_Studio
                 {
                     Owner = this
                 };
-                simWindow.SetSimulationData(simulationData.Points, simulationData.PointStepIndex, simulationData.Steps);
+                simWindow.SetSimulationData(simulationData.Points, simulationData.PointStepIndex, simulationData.Steps, simulationData.KeyPoints);
                 simWindow.SaveCurrentFileRequested = SaveCurrentOpenedFile;
                 simWindow.SaveAsFileRequested = SaveCurrentOpenedFileAs;
                 simWindow.StepJsonUpdated += (index, json) =>
@@ -1377,7 +1432,7 @@ namespace EtherCAT_Studio
                 {
                     Owner = this
                 };
-                simWindow.SetSimulationData(simulationData.Points, simulationData.PointStepIndex, simulationData.Steps);
+                simWindow.SetSimulationData(simulationData.Points, simulationData.PointStepIndex, simulationData.Steps, simulationData.KeyPoints);
                 simWindow.SaveCurrentFileRequested = SaveCurrentOpenedFile;
                 simWindow.SaveAsFileRequested = SaveCurrentOpenedFileAs;
                 simWindow.StepJsonUpdated += (index, json) =>
@@ -1400,6 +1455,7 @@ namespace EtherCAT_Studio
             public List<Point3D> Points { get; } = new();
             public List<int> PointStepIndex { get; } = new();
             public List<SimulationWindow.SimulationStep> Steps { get; } = new();
+            public List<Point3D> KeyPoints { get; } = new();
         }
 
         private SimulationData BuildSimulationData(List<NodeControl> nodes)
@@ -1408,6 +1464,7 @@ namespace EtherCAT_Studio
             double x = 0, y = 0, z = 0;
             data.Points.Add(new Point3D(x, y, z));
             data.PointStepIndex.Add(-1);
+            data.KeyPoints.Add(new Point3D(x, y, z));
 
             for (int i = 0; i < nodes.Count; i++)
             {
@@ -1418,7 +1475,41 @@ namespace EtherCAT_Studio
                 data.Steps.Add(new SimulationWindow.SimulationStep { Id = id, Type = type, Json = json });
             }
 
+            var idToIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var labelToIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < nodes.Count; i++)
+            {
+                var node = nodes[i];
+                string id = node.NodeNumber > 0 ? $"node_{node.NodeNumber:00}" : $"node_{i + 1:00}";
+                if (!idToIndex.ContainsKey(id)) idToIndex[id] = i;
+
+                string label = node.Label?.Text ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(label) && !labelToIndex.ContainsKey(label))
+                {
+                    labelToIndex[label] = i;
+                }
+
+                if (!string.IsNullOrWhiteSpace(node.JsonData))
+                {
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(node.JsonData);
+                        var root = doc.RootElement;
+                        if (root.TryGetProperty("label", out var lbl) && lbl.ValueKind == System.Text.Json.JsonValueKind.String)
+                        {
+                            var val = lbl.GetString();
+                            if (!string.IsNullOrWhiteSpace(val) && !labelToIndex.ContainsKey(val))
+                            {
+                                labelToIndex[val] = i;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            int safety = 0;
+            for (int i = 0; i < nodes.Count && safety < 2000; i++, safety++)
             {
                 var node = nodes[i];
                 var type = (node.NodeType ?? string.Empty).ToUpperInvariant();
@@ -1474,6 +1565,35 @@ namespace EtherCAT_Studio
 
                         data.Points.Add(new Point3D(x, y, z));
                         data.PointStepIndex.Add(i);
+                        data.KeyPoints.Add(new Point3D(x, y, z));
+                    }
+                    else if (type == "WAIT")
+                    {
+                        int delayMs = (int)GetPropNumber(root, "delay_ms", "delay");
+                        int holdSteps = Math.Clamp(delayMs / 50, 1, 200);
+                        for (int j = 0; j < holdSteps; j++)
+                        {
+                            data.Points.Add(new Point3D(x, y, z));
+                            data.PointStepIndex.Add(i);
+                        }
+                    }
+                    else if (type == "GOTO" || type == "FLOW")
+                    {
+                        string target = GetPropString(root, "to", "");
+                        if (string.IsNullOrWhiteSpace(target)) target = GetPropString(root, "gotoNode", "");
+                        if (string.IsNullOrWhiteSpace(target)) target = GetPropString(root, "targetNode", "");
+                        if (string.IsNullOrWhiteSpace(target)) target = GetPropString(root, "jump_target", "");
+
+                        data.Points.Add(new Point3D(x, y, z));
+                        data.PointStepIndex.Add(i);
+
+                        if (!string.IsNullOrWhiteSpace(target))
+                        {
+                            if (idToIndex.TryGetValue(target, out var targetIndex) || labelToIndex.TryGetValue(target, out targetIndex))
+                            {
+                                i = targetIndex - 1;
+                            }
+                        }
                     }
                     else if (type == "REL_MOVE")
                     {
@@ -1486,6 +1606,7 @@ namespace EtherCAT_Studio
 
                         data.Points.Add(new Point3D(x, y, z));
                         data.PointStepIndex.Add(i);
+                        data.KeyPoints.Add(new Point3D(x, y, z));
                     }
                     else if (type == "LINEAR_MOVE")
                     {
@@ -1496,6 +1617,7 @@ namespace EtherCAT_Studio
                             z = GetPropNumber(t, "Z");
                             data.Points.Add(new Point3D(x, y, z));
                             data.PointStepIndex.Add(i);
+                            data.KeyPoints.Add(new Point3D(x, y, z));
                         }
                     }
                     else if (type == "CIRCULAR_MOVE")
@@ -1580,6 +1702,7 @@ namespace EtherCAT_Studio
                                 }
                                 data.Points.Add(new Point3D(x, y, z));
                                 data.PointStepIndex.Add(i);
+                                data.KeyPoints.Add(new Point3D(x, y, z));
                                 continue;
                             }
 
@@ -1651,15 +1774,24 @@ namespace EtherCAT_Studio
 
                             if (plane == "XZ")
                             {
+                                data.KeyPoints.Add(new Point3D(startU, y, startV));
+                                data.KeyPoints.Add(new Point3D(passU, y, passV));
                                 x = endU; z = endV;
+                                data.KeyPoints.Add(new Point3D(x, y, z));
                             }
                             else if (plane == "YZ")
                             {
+                                data.KeyPoints.Add(new Point3D(x, startU, startV));
+                                data.KeyPoints.Add(new Point3D(x, passU, passV));
                                 y = endU; z = endV;
+                                data.KeyPoints.Add(new Point3D(x, y, z));
                             }
                             else
                             {
+                                data.KeyPoints.Add(new Point3D(startU, startV, z));
+                                data.KeyPoints.Add(new Point3D(passU, passV, z));
                                 x = endU; y = endV;
+                                data.KeyPoints.Add(new Point3D(x, y, z));
                             }
                         }
                         else if (root.TryGetProperty("center", out var c))
@@ -1775,22 +1907,35 @@ namespace EtherCAT_Studio
                                     }
                                     data.PointStepIndex.Add(i);
                                 }
-                            }
 
-                            if (plane == "XZ")
-                            {
-                                x = centerU + radius * Math.Cos(endAngle);
-                                z = centerV + radius * Math.Sin(endAngle);
-                            }
-                            else if (plane == "YZ")
-                            {
-                                y = centerU + radius * Math.Cos(endAngle);
-                                z = centerV + radius * Math.Sin(endAngle);
-                            }
-                            else
-                            {
-                                x = centerU + radius * Math.Cos(endAngle);
-                                y = centerV + radius * Math.Sin(endAngle);
+                                double midAngle = (startAngle + endAngle) / 2.0;
+                                double midU = centerU + radius * Math.Cos(midAngle);
+                                double midV = centerV + radius * Math.Sin(midAngle);
+
+                                if (plane == "XZ")
+                                {
+                                    data.KeyPoints.Add(new Point3D(startU, y, startV));
+                                    data.KeyPoints.Add(new Point3D(midU, y, midV));
+                                    x = centerU + radius * Math.Cos(endAngle);
+                                    z = centerV + radius * Math.Sin(endAngle);
+                                    data.KeyPoints.Add(new Point3D(x, y, z));
+                                }
+                                else if (plane == "YZ")
+                                {
+                                    data.KeyPoints.Add(new Point3D(x, startU, startV));
+                                    data.KeyPoints.Add(new Point3D(x, midU, midV));
+                                    y = centerU + radius * Math.Cos(endAngle);
+                                    z = centerV + radius * Math.Sin(endAngle);
+                                    data.KeyPoints.Add(new Point3D(x, y, z));
+                                }
+                                else
+                                {
+                                    data.KeyPoints.Add(new Point3D(startU, startV, z));
+                                    data.KeyPoints.Add(new Point3D(midU, midV, z));
+                                    x = centerU + radius * Math.Cos(endAngle);
+                                    y = centerV + radius * Math.Sin(endAngle);
+                                    data.KeyPoints.Add(new Point3D(x, y, z));
+                                }
                             }
                         }
                     }
@@ -1921,6 +2066,7 @@ namespace EtherCAT_Studio
                             "CHECK_DI" => Brushes.Gold,
                             "GOTO" => Brushes.IndianRed,
                             "JUMP" => Brushes.MediumPurple,
+                            "LABEL" => new SolidColorBrush(Color.FromRgb(0x14, 0xB8, 0xA6)),
                             "START" => Brushes.LimeGreen,
                             "END" => Brushes.Red,
                             "LINEAR_MOVE" => Brushes.Blue,
@@ -1937,6 +2083,7 @@ namespace EtherCAT_Studio
                             JsonData = jsonDataStr
                         };
                         node.Label.Text = type;
+                        node.ApplyJsonData(jsonDataStr);
                         node.SetNodeNumber(nodeCount + 1);
 
                         // 자동 배치 (위에서 아래로, 열 3개)

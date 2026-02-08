@@ -65,17 +65,31 @@
             </Grid.ColumnDefinitions>
             <!-- Toolbox -->
             <StackPanel Grid.Column="0" Background="#232323" Orientation="Vertical" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Width="150">
-                <Button Content="ABS MOVE" ToolTip="위치 제어 (절대 이동)" Background="#2176FF" Foreground="White" FontSize="14" Click="AddAbsMoveNode_Click" Style="{StaticResource ToolButtonStyle}"/>
-                <Button Content="REL MOVE" ToolTip="상대 이동" Background="#1E88E5" Foreground="White" FontSize="14" Click="AddRelMoveNode_Click" Style="{StaticResource ToolButtonStyle}"/>
-                <Button Content="LINEAR MOVE" ToolTip="선형 이동" Background="#3B82F6" Foreground="White" FontSize="14" Click="AddLinearMoveNode_Click" Style="{StaticResource ToolButtonStyle}"/>
-                <Button Content="CIRCULAR MOVE" ToolTip="원호 이동" Background="#5E35B1" Foreground="White" FontSize="12" Click="AddCircularMoveNode_Click" Style="{StaticResource ToolButtonStyle}"/>
-                <Button Content="WAIT" ToolTip="시간 지연" Background="#FF8800" Foreground="White" FontSize="16" Click="AddWaitNode_Click" Style="{StaticResource ToolButtonStyle}"/>
-                <Button Content="COUNTER" ToolTip="카운터" Background="#AB47BC" Foreground="White" FontSize="14" Click="AddCounterNode_Click" Style="{StaticResource ToolButtonStyle}"/>
-                <Button Content="SET DO" ToolTip="신호 출력" Background="#22C55E" Foreground="White" FontSize="14" Click="AddSetDo_Click" Style="{StaticResource ToolButtonStyle}"/>
-                <Button Content="CHECK DI" ToolTip="센서 확인" Background="#F59E0B" Foreground="White" FontSize="14" Click="AddCheckDi_Click" Style="{StaticResource ToolButtonStyle}"/>
-                <Button Content="GOTO" ToolTip="반복/이동" Background="#FF3B30" Foreground="White" FontSize="16" Click="AddGoto_Click" Style="{StaticResource ToolButtonStyle}"/>
-                <Button Content="START" ToolTip="시퀀스 시작" Background="#10B981" Foreground="White" FontSize="16" Click="AddStartNode_Click" Style="{StaticResource ToolButtonStyle}"/>
-                <Button Content="END" ToolTip="시퀀스 종료" Background="#EF4444" Foreground="White" FontSize="16" Click="AddEndNode_Click" Style="{StaticResource ToolButtonStyle}"/>
+                <TextBlock Text="NODE TEMPLATE" Foreground="White" FontWeight="Bold" Margin="8,10,8,6"/>
+                <ComboBox x:Name="NodeTemplateCombo" Margin="8,0,8,10" Background="#1E1E1E" Foreground="White"
+                          SelectionChanged="NodeTemplateCombo_SelectionChanged" SelectedIndex="-1">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{Binding RelativeSource={RelativeSource AncestorType=ComboBoxItem}, Path=Tag}"
+                                    CornerRadius="6" Padding="6,4" Margin="2">
+                                <TextBlock Text="{Binding Content, RelativeSource={RelativeSource AncestorType=ComboBoxItem}}"
+                                           Foreground="White" FontWeight="Bold" />
+                            </Border>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                    <ComboBoxItem Content="ABS MOVE" Tag="#2176FF"/>
+                    <ComboBoxItem Content="REL MOVE" Tag="#1E88E5"/>
+                    <ComboBoxItem Content="LINEAR MOVE" Tag="#3B82F6"/>
+                    <ComboBoxItem Content="CIRCULAR MOVE" Tag="#5E35B1"/>
+                    <ComboBoxItem Content="WAIT" Tag="#FF8800"/>
+                    <ComboBoxItem Content="COUNTER" Tag="#AB47BC"/>
+                    <ComboBoxItem Content="SET DO" Tag="#22C55E"/>
+                    <ComboBoxItem Content="CHECK DI" Tag="#F59E0B"/>
+                    <ComboBoxItem Content="GOTO" Tag="#FF3B30"/>
+                    <ComboBoxItem Content="LABEL" Tag="#14B8A6"/>
+                    <ComboBoxItem Content="START" Tag="#10B981"/>
+                    <ComboBoxItem Content="END" Tag="#EF4444"/>
+                </ComboBox>
                 <!-- File Management Section -->
                 <Separator Margin="6,20,6,12" Background="#444"/>
                 <Button Content="LOAD" ToolTip="파일에서 불러오기" Background="#10B981" Foreground="White" FontSize="16" Click="LoadFile_Click" Style="{StaticResource ToolButtonStyle}"/>

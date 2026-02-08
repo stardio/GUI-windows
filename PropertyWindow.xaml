@@ -70,7 +70,15 @@
 
         <ScrollViewer Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
                       VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <ContentControl x:Name="NodeSpecificContent" VerticalContentAlignment="Top"/>
+            <ContentControl x:Name="NodeSpecificContent" VerticalContentAlignment="Top">
+                <ContentControl.Resources>
+                    <Style TargetType="ComboBox" BasedOn="{StaticResource DarkComboBoxStyle}" />
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Background" Value="#000" />
+                        <Setter Property="Foreground" Value="White" />
+                    </Style>
+                </ContentControl.Resources>
+            </ContentControl>
         </ScrollViewer>
 
         <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
