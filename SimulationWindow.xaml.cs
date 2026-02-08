@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -20,6 +23,17 @@ namespace EtherCAT_Studio
             public string Label => $"{Id}  {Type}";
         }
 
+        public class EditableParam
+        {
+            public string Path { get; set; } = "";
+            public string Value { get; set; } = "";
+            public JsonValueKind Kind { get; set; } = JsonValueKind.String;
+        }
+
+        public event Action<int, string>? StepJsonUpdated;
+        public Func<bool>? SaveCurrentFileRequested;
+        public Func<bool>? SaveAsFileRequested;
+
         private readonly DispatcherTimer _timer;
         private List<Point3D> _points = new();
         private List<int> _pointStepIndex = new();
@@ -37,6 +51,7 @@ namespace EtherCAT_Studio
         private readonly TranslateTransform3D _cursorTransform;
         private readonly List<Point3D> _trailPoints = new();
         private readonly List<Viewport2DVisual3D> _labelVisuals = new();
+        private readonly ObservableCollection<EditableParam> _editParams = new();
         private PerspectiveCamera _camera;
         private double _yaw = 45;
         private double _pitch = 35;
@@ -110,6 +125,7 @@ namespace EtherCAT_Studio
             Viewport.Children.Add(modelVisual);
 
             AddAxisLabels(2000, 200);
+            AddAxisXYZLabels();
         }
 
         public void SetSimulationData(IReadOnlyList<Point3D> points, IReadOnlyList<int> pointStepIndex, IReadOnlyList<SimulationStep> steps)
@@ -118,6 +134,7 @@ namespace EtherCAT_Studio
             _pointStepIndex = pointStepIndex?.ToList() ?? new List<int>();
             _steps = steps?.ToList() ?? new List<SimulationStep>();
             StepList.ItemsSource = _steps.Select(s => s.Label).ToList();
+            ParamGrid.ItemsSource = _editParams;
             ResetTrail();
 
             // Path mesh (full path for visibility)
@@ -227,7 +244,9 @@ namespace EtherCAT_Studio
 
         private void UpdateCoordText(Point3D point)
         {
-            CoordText.Text = $"X: {point.X:0.##}  Y: {point.Y:0.##}  Z: {point.Z:0.##}";
+            CoordValueX.Text = $"{point.X:0.##}";
+            CoordValueY.Text = $"{point.Y:0.##}";
+            CoordValueZ.Text = $"{point.Z:0.##}";
         }
 
         private void UpdateCurrentStepByPointIndex(int pointIndex)
@@ -245,6 +264,192 @@ namespace EtherCAT_Studio
             CurrentStepText.Text = step.Label;
             StepJsonText.Text = TryFormatJson(step.Json);
             _currentSpeedFactor = GetSpeedFactor(step.Json);
+
+            BuildEditableParams(step.Json);
+        }
+
+        private void UpdateCurrentStepByIndex(int stepIndex)
+        {
+            if (_steps.Count == 0) return;
+            if (stepIndex < 0 || stepIndex >= _steps.Count) return;
+            if (stepIndex == _currentStepIndex) return;
+
+            _currentStepIndex = stepIndex;
+            StepList.SelectedIndex = stepIndex;
+            var step = _steps[stepIndex];
+            CurrentStepText.Text = step.Label;
+            StepJsonText.Text = TryFormatJson(step.Json);
+            _currentSpeedFactor = GetSpeedFactor(step.Json);
+            BuildEditableParams(step.Json);
+        }
+
+        private void StepList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (StepList.SelectedIndex >= 0)
+            {
+                UpdateCurrentStepByIndex(StepList.SelectedIndex);
+            }
+        }
+
+        private void BuildEditableParams(string json)
+        {
+            _editParams.Clear();
+            try
+            {
+                var node = JsonNode.Parse(string.IsNullOrWhiteSpace(json) ? "{}" : json);
+                if (node == null) return;
+
+                void Walk(JsonNode? n, string path)
+                {
+                    if (n == null) return;
+                    if (n is JsonValue val)
+                    {
+                        JsonValueKind kind = JsonValueKind.String;
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(val.ToJsonString());
+                            kind = doc.RootElement.ValueKind;
+                        }
+                        catch { }
+
+                        string valueText = val.ToJsonString();
+                        if (kind == JsonValueKind.String)
+                        {
+                            valueText = valueText.Trim('"');
+                        }
+
+                        _editParams.Add(new EditableParam
+                        {
+                            Path = path,
+                            Value = valueText,
+                            Kind = kind
+                        });
+                        return;
+                    }
+
+                    if (n is JsonObject obj)
+                    {
+                        foreach (var kv in obj)
+                        {
+                            string childPath = string.IsNullOrEmpty(path) ? kv.Key : $"{path}.{kv.Key}";
+                            Walk(kv.Value, childPath);
+                        }
+                        return;
+                    }
+
+                    if (n is JsonArray arr)
+                    {
+                        for (int i = 0; i < arr.Count; i++)
+                        {
+                            string childPath = $"{path}[{i}]";
+                            Walk(arr[i], childPath);
+                        }
+                    }
+                }
+
+                Walk(node, "");
+            }
+            catch
+            {
+                // ignore parse errors
+            }
+        }
+
+        private void ApplyJson_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentStepIndex < 0 || _currentStepIndex >= _steps.Count) return;
+
+            var step = _steps[_currentStepIndex];
+            try
+            {
+                var node = JsonNode.Parse(string.IsNullOrWhiteSpace(step.Json) ? "{}" : step.Json);
+                if (node == null) return;
+
+                foreach (var param in _editParams)
+                {
+                    SetJsonValue(node, param.Path, param.Value, param.Kind);
+                }
+
+                step.Json = node.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+                StepJsonText.Text = step.Json;
+                _currentSpeedFactor = GetSpeedFactor(step.Json);
+                StepJsonUpdated?.Invoke(_currentStepIndex, step.Json);
+            }
+            catch
+            {
+                // ignore apply errors
+            }
+        }
+
+        private void SaveJson_Click(object sender, RoutedEventArgs e)
+        {
+            if (SaveCurrentFileRequested?.Invoke() == true) return;
+            SaveAsFileRequested?.Invoke();
+        }
+
+        private void SaveAsJson_Click(object sender, RoutedEventArgs e)
+        {
+            SaveAsFileRequested?.Invoke();
+        }
+
+        private static void SetJsonValue(JsonNode node, string path, string value, JsonValueKind kind)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return;
+
+            JsonNode? current = node;
+            string[] parts = path.Split('.');
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string part = parts[i];
+                int bracket = part.IndexOf('[');
+                if (bracket >= 0)
+                {
+                    string propName = part.Substring(0, bracket);
+                    if (!string.IsNullOrEmpty(propName))
+                    {
+                        current = (current as JsonObject)?[propName];
+                    }
+
+                    while (bracket >= 0 && current is JsonArray arr)
+                    {
+                        int end = part.IndexOf(']', bracket + 1);
+                        if (end < 0) return;
+                        string idxStr = part.Substring(bracket + 1, end - bracket - 1);
+                        if (!int.TryParse(idxStr, out int idx) || idx < 0 || idx >= arr.Count) return;
+
+                        bool isLastPart = (i == parts.Length - 1) && (part.IndexOf('[', end + 1) < 0);
+                        if (isLastPart)
+                        {
+                            arr[idx] = CreateValueNode(value, kind);
+                            return;
+                        }
+
+                        current = arr[idx];
+                        bracket = part.IndexOf('[', end + 1);
+                    }
+                }
+                else
+                {
+                    if (i == parts.Length - 1 && current is JsonObject obj)
+                    {
+                        obj[part] = CreateValueNode(value, kind);
+                        return;
+                    }
+                    current = (current as JsonObject)?[part];
+                }
+            }
+        }
+
+        private static JsonNode CreateValueNode(string value, JsonValueKind kind)
+        {
+            return kind switch
+            {
+                JsonValueKind.Number => double.TryParse(value, out var d) ? JsonValue.Create(d) : JsonValue.Create(0),
+                JsonValueKind.True => JsonValue.Create(true),
+                JsonValueKind.False => JsonValue.Create(false),
+                JsonValueKind.Null => JsonValue.Create((string?)null),
+                _ => JsonValue.Create(value)
+            };
         }
 
         private static double GetSpeedFactor(string json)
@@ -365,6 +570,13 @@ namespace EtherCAT_Studio
             }
         }
 
+        private void AddAxisXYZLabels()
+        {
+            AddLabelVisual(new Point3D(430, -14, 0), new Vector3D(1, 0, 0), new Vector3D(0, 0, 1), 20, 16, "X");
+            AddLabelVisual(new Point3D(0, 430, 0), new Vector3D(1, 0, 0), new Vector3D(0, 0, 1), 20, 16, "Y");
+            AddLabelVisual(new Point3D(0, -14, 430), new Vector3D(1, 0, 0), new Vector3D(0, 1, 0), 20, 16, "Z");
+        }
+
         private void ClearAxisLabels()
         {
             foreach (var visual in _labelVisuals)
@@ -477,6 +689,22 @@ namespace EtherCAT_Studio
             _camera.UpDirection = new Vector3D(0, 0, 1);
         }
 
+        private void SetCameraView(double yaw, double pitch)
+        {
+            _yaw = yaw;
+            _pitch = Math.Max(-89, Math.Min(89, pitch));
+            UpdateCamera();
+        }
+
+        private void CamFront_Click(object sender, RoutedEventArgs e) => SetCameraView(90, 0);
+        private void CamBack_Click(object sender, RoutedEventArgs e) => SetCameraView(270, 0);
+        private void CamLeft_Click(object sender, RoutedEventArgs e) => SetCameraView(180, 0);
+        private void CamRight_Click(object sender, RoutedEventArgs e) => SetCameraView(0, 0);
+        private void CamTop_Click(object sender, RoutedEventArgs e) => SetCameraView(45, 89);
+        private void CamBottom_Click(object sender, RoutedEventArgs e) => SetCameraView(45, -89);
+        private void CamIso_Click(object sender, RoutedEventArgs e) => SetCameraView(45, 35);
+        private void CamFit_Click(object sender, RoutedEventArgs e) => AutoCenterCamera();
+
         private static Model3DGroup CreateAxisModel()
         {
             var group = new Model3DGroup();
@@ -490,6 +718,13 @@ namespace EtherCAT_Studio
 
             group.Children.Add(new GeometryModel3D
             {
+                Geometry = CreateConeMesh(new Point3D(360, 0, 0), new Vector3D(1, 0, 0), 20, 6, 16),
+                Material = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(255, 80, 80))),
+                BackMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(255, 80, 80)))
+            });
+
+            group.Children.Add(new GeometryModel3D
+            {
                 Geometry = CreateCylinderMesh(new Point3D(0, 0, 0), new Point3D(0, 400, 0), 2),
                 Material = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(80, 255, 120))),
                 BackMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(80, 255, 120)))
@@ -497,7 +732,21 @@ namespace EtherCAT_Studio
 
             group.Children.Add(new GeometryModel3D
             {
+                Geometry = CreateConeMesh(new Point3D(0, 360, 0), new Vector3D(0, 1, 0), 20, 6, 16),
+                Material = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(80, 255, 120))),
+                BackMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(80, 255, 120)))
+            });
+
+            group.Children.Add(new GeometryModel3D
+            {
                 Geometry = CreateCylinderMesh(new Point3D(0, 0, 0), new Point3D(0, 0, 400), 2),
+                Material = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(80, 160, 255))),
+                BackMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(80, 160, 255)))
+            });
+
+            group.Children.Add(new GeometryModel3D
+            {
+                Geometry = CreateConeMesh(new Point3D(0, 0, 360), new Vector3D(0, 0, 1), 20, 6, 16),
                 Material = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(80, 160, 255))),
                 BackMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(80, 160, 255)))
             });
@@ -627,6 +876,49 @@ namespace EtherCAT_Studio
         {
             var mesh = new MeshGeometry3D();
             AppendCylinder(mesh, p0, p1, radius, 12);
+            return mesh;
+        }
+
+        private static MeshGeometry3D CreateConeMesh(Point3D baseCenter, Vector3D direction, double height, double radius, int slices)
+        {
+            var mesh = new MeshGeometry3D();
+            if (direction.Length < 0.0001) return mesh;
+            direction.Normalize();
+
+            Vector3D up = new Vector3D(0, 0, 1);
+            if (Math.Abs(Vector3D.DotProduct(direction, up)) > 0.9)
+            {
+                up = new Vector3D(0, 1, 0);
+            }
+
+            var u = Vector3D.CrossProduct(direction, up);
+            u.Normalize();
+            var v = Vector3D.CrossProduct(direction, u);
+            v.Normalize();
+
+            Point3D tip = baseCenter + direction * height;
+            int baseIndex = 0;
+
+            for (int i = 0; i < slices; i++)
+            {
+                double theta = 2 * Math.PI * i / slices;
+                double cx = Math.Cos(theta) * radius;
+                double cy = Math.Sin(theta) * radius;
+                var point = baseCenter + u * cx + v * cy;
+                mesh.Positions.Add(point);
+            }
+
+            mesh.Positions.Add(tip);
+            int tipIndex = mesh.Positions.Count - 1;
+
+            for (int i = 0; i < slices; i++)
+            {
+                int next = (i + 1) % slices;
+                mesh.TriangleIndices.Add(i + baseIndex);
+                mesh.TriangleIndices.Add(next + baseIndex);
+                mesh.TriangleIndices.Add(tipIndex);
+            }
+
             return mesh;
         }
 

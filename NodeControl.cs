@@ -176,6 +176,22 @@ namespace EtherCAT_Studio
             _numberBadge.Text = number > 0 ? number.ToString() : string.Empty;
         }
 
+        public void ApplyJsonData(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return;
+            JsonData = json;
+            try
+            {
+                var doc = System.Text.Json.JsonDocument.Parse(JsonData);
+                if (doc.RootElement.TryGetProperty("label", out var lbl) && lbl.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    var newLabel = lbl.GetString();
+                    if (!string.IsNullOrEmpty(newLabel)) Label.Text = newLabel;
+                }
+            }
+            catch { }
+        }
+
         // 더블클릭 시 PropertyWindow 띄우기
         private void Node_DoubleClick(object sender, MouseButtonEventArgs e)
         {

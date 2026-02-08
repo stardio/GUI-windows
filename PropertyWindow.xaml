@@ -1,9 +1,10 @@
 <Window x:Class="EtherCAT_Studio.PropertyWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="속성 편집" Height="320" Width="560"
+        Title="속성 편집" Height="420" Width="560"
+        MinHeight="360"
         WindowStartupLocation="CenterOwner"
-        Background="#232323" Foreground="White" ResizeMode="NoResize">
+        Background="#232323" Foreground="White" ResizeMode="CanResize">
     <Window.Resources>
         <!-- Ensure ComboBox popup and other system-drawn controls use dark brushes -->
         <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#000000" />
@@ -58,11 +59,6 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -72,9 +68,12 @@
         <TextBlock Text="Comment" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,0,4"/>
         <TextBox x:Name="JumpTargetBox" Grid.Row="1" Grid.Column="1" Margin="0,0,0,4" Background="#000" Foreground="White"/>
 
-        <ContentControl x:Name="NodeSpecificContent" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Grid.RowSpan="8"/>
+        <ScrollViewer Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ContentControl x:Name="NodeSpecificContent" VerticalContentAlignment="Top"/>
+        </ScrollViewer>
 
-        <StackPanel Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+        <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Content="확인" Width="80" Margin="0,0,8,0" Click="Ok_Click" Background="#0078D7" Foreground="White"/>
             <Button Content="취소" Width="80" Click="Cancel_Click" Background="#444" Foreground="White"/>
         </StackPanel>

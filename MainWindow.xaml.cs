@@ -32,6 +32,8 @@ namespace EtherCAT_Studio
         private Connection? _selectedConnection = null;
         private PortInfo? _draggingFromPort = null;
         private Path? _tempWire = null;
+        private string? _currentFilePath;
+        private bool _currentFileIsSequence;
 
         public MainWindow()
         {
@@ -365,6 +367,8 @@ namespace EtherCAT_Studio
                 try
                 {
                     SaveProjectToPath(dlg.FileName);
+                    _currentFilePath = dlg.FileName;
+                    _currentFileIsSequence = false;
                     MessageBox.Show($"프로젝트를 저장했습니다:\n{dlg.FileName}");
                 }
                 catch (Exception ex)
@@ -396,12 +400,16 @@ namespace EtherCAT_Studio
                     {
                         // JSON Sequence 형식 (.json - Export JSON/AI 생성)
                         LoadSequenceJsonIntoCanvas(json);
+                        _currentFilePath = dlg.FileName;
+                        _currentFileIsSequence = true;
                         MessageBox.Show($"JSON 시퀀스를 불러왔습니다:\n{dlg.FileName}");
                     }
                     else if (root.TryGetProperty("nodes", out var nodesArray))
                     {
                         // EtherCAT Project 형식 (.ethercat)
                         LoadEthercatProject(root, nodesArray);
+                        _currentFilePath = dlg.FileName;
+                        _currentFileIsSequence = false;
                         MessageBox.Show($"프로젝트를 불러왔습니다:\n{dlg.FileName}");
                     }
                     else
@@ -523,6 +531,66 @@ namespace EtherCAT_Studio
             System.IO.File.WriteAllText(filePath, json);
         }
 
+        private bool SaveCurrentOpenedFile()
+        {
+            if (string.IsNullOrWhiteSpace(_currentFilePath))
+            {
+                _currentFilePath = GetLastSessionPath();
+                _currentFileIsSequence = false;
+            }
+
+            var result = MessageBox.Show(
+                $"현재 열린 파일을 저장할까요?\n\n{_currentFilePath}",
+                "저장 확인",
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Question);
+            if (result != MessageBoxResult.OK)
+            {
+                return false;
+            }
+
+            try
+            {
+                if (_currentFileIsSequence)
+                {
+                    var seqJson = BuildSequenceJsonString();
+                    if (string.IsNullOrEmpty(seqJson)) return false;
+                    System.IO.File.WriteAllText(_currentFilePath, seqJson);
+                }
+                else
+                {
+                    SaveProjectToPath(_currentFilePath);
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"저장 실패: {ex.Message}");
+                return false;
+            }
+        }
+
+        private bool SaveCurrentOpenedFileAs()
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                FileName = _currentFileIsSequence ? "sequence" : "project",
+                DefaultExt = _currentFileIsSequence ? ".json" : ".ethercat",
+                Filter = _currentFileIsSequence
+                    ? "JSON Sequence (*.json)|*.json|All Files (*.*)|*.*"
+                    : "EtherCAT Project (*.ethercat)|*.ethercat|All Files (*.*)|*.*"
+            };
+
+            if (dlg.ShowDialog() == true)
+            {
+                _currentFilePath = dlg.FileName;
+                _currentFileIsSequence = System.IO.Path.GetExtension(dlg.FileName).Equals(".json", StringComparison.OrdinalIgnoreCase);
+                return SaveCurrentOpenedFile();
+            }
+
+            return false;
+        }
+
         private void LoadProjectFromJson(string json)
         {
             using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -536,6 +604,25 @@ namespace EtherCAT_Studio
         // 저장 버튼 클릭 시 모든 노드를 시퀀스 JSON 구조로 파일로 저장
         private void SaveJson_Click(object sender, RoutedEventArgs e)
         {
+            var outJson = BuildSequenceJsonString();
+            if (string.IsNullOrEmpty(outJson)) return;
+
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = "JSON 파일 (*.json)|*.json|모든 파일 (*.*)|*.*",
+                FileName = "sequence.json"
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                System.IO.File.WriteAllText(dlg.FileName, outJson);
+                _currentFilePath = dlg.FileName;
+                _currentFileIsSequence = true;
+                MessageBox.Show("저장 완료: " + dlg.FileName);
+            }
+        }
+
+        private string? BuildSequenceJsonString()
+        {
             var steps = new List<object>();
             int idx = 1;
             var allNodes = new List<NodeControl>();
@@ -547,7 +634,7 @@ namespace EtherCAT_Studio
             if (allNodes.Count == 0)
             {
                 MessageBox.Show("저장할 노드가 없습니다.");
-                return;
+                return null;
             }
 
             // Find START node and build sequence based on connections
@@ -808,17 +895,7 @@ namespace EtherCAT_Studio
 
             var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
             string outJson = System.Text.Json.JsonSerializer.Serialize(rootObj, options);
-
-            var dlg = new Microsoft.Win32.SaveFileDialog
-            {
-                Filter = "JSON 파일 (*.json)|*.json|모든 파일 (*.*)|*.*",
-                FileName = "sequence.json"
-            };
-            if (dlg.ShowDialog() == true)
-            {
-                System.IO.File.WriteAllText(dlg.FileName, outJson);
-                MessageBox.Show("저장 완료: " + dlg.FileName);
-            }
+            return outJson;
         }
 
         private void RunSequence_Click(object sender, RoutedEventArgs e)
@@ -1235,6 +1312,15 @@ namespace EtherCAT_Studio
                     Owner = this
                 };
                 simWindow.SetSimulationData(simulationData.Points, simulationData.PointStepIndex, simulationData.Steps);
+                simWindow.SaveCurrentFileRequested = SaveCurrentOpenedFile;
+                simWindow.SaveAsFileRequested = SaveCurrentOpenedFileAs;
+                simWindow.StepJsonUpdated += (index, json) =>
+                {
+                    if (index >= 0 && index < nodes.Count)
+                    {
+                        nodes[index].ApplyJsonData(json);
+                    }
+                };
                 simWindow.Show();
             }
 
@@ -1292,6 +1378,15 @@ namespace EtherCAT_Studio
                     Owner = this
                 };
                 simWindow.SetSimulationData(simulationData.Points, simulationData.PointStepIndex, simulationData.Steps);
+                simWindow.SaveCurrentFileRequested = SaveCurrentOpenedFile;
+                simWindow.SaveAsFileRequested = SaveCurrentOpenedFileAs;
+                simWindow.StepJsonUpdated += (index, json) =>
+                {
+                    if (index >= 0 && index < nodes.Count)
+                    {
+                        nodes[index].ApplyJsonData(json);
+                    }
+                };
                 simWindow.Show();
             }
             else
